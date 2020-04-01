@@ -86,6 +86,7 @@ class VideoCapture extends React.Component {
     }
     paintCanvas(){
         let frames = [];
+        let tested = false;
 
         setInterval(() => {
             const canvas = this.stream_stage;
@@ -95,20 +96,23 @@ class VideoCapture extends React.Component {
 
             ctx.drawImage(this.stream_src, 0, 0, canvas.width, canvas.height);
 
+
             if(this.state.recording){
                 const point = this.state.tracker.tracker.update();
 
                 if(this.state.recording === -1){ // collecting frames
-                    console.log(point);
                     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     // use darknet to box the eyes only
 
-                    frames.push({point, frame});
+                    if (!tested){
+                        frames.push({point, frame});
+                    }
 
                     if(frames.length > this.state.frame_rate * 5){ 
-                        // console.log(frames);
+                        console.log(frames);
                         //  send frames to server every 5 seconds;
                         frames = []; //reset
+                        tested = true;
                     }
                 }
             }
@@ -142,15 +146,16 @@ class VideoCapture extends React.Component {
         return (
             <div className="row">
                 <div className="col-12 border-right border-primary border-2x py-0">
-                    <h5 className="col-12">
-                        {Utils.TextUtils.getLocalCaption("_click_tracker")}
-                    </h5>
-                    <div className="btn-group my-3">
-                        {this.getPlayButton("ZigZag")}
-                        {this.getPlayButton("Wavey")}
-                        {this.getPlayButton("Random")}
+                    <div className="col-12 px-0">
+                        <h5 className="">
+                            {Utils.TextUtils.getLocalCaption("_click_tracker")}
+                        </h5>
+                        <div className="btn-group my-3">
+                            {this.getPlayButton("ZigZag")}
+                            {this.getPlayButton("Wavey")}
+                            {this.getPlayButton("Random")}
+                        </div>
                     </div>
-
                     <canvas
                         width={this.state.width} 
                         height={this.state.height} 
@@ -160,7 +165,7 @@ class VideoCapture extends React.Component {
                     
                     <video 
                         ref={this.setStream_src}
-                        className="invisible"
+                        className="invisiblex"
                         height="1"
                         onPlay={this.paintCanvas}
                         autoPlay>

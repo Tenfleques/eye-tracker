@@ -3,6 +3,14 @@
         "title" : "Eye Tracker",
         "description" : "application title"
     },
+    "_select_tracker_function" : {
+        "title" : "Select tracker type",
+        "description" : "tracker type"
+    },
+    "_define_tracker_frequency": {
+        "title" : "Define the tracker frequency",
+        "description" : "label for the tracker frequency control"
+    },
     "_data_capture_page" : {
         "title" : "Data Capture",
         "description" : "application title"

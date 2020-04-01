@@ -18,8 +18,16 @@ const LoadExternelScript = (url) =>{
     })
 }
 
+const CycleIndex = (index, l) => {
+  if (index > l - 2){
+      return 0;
+  }
+  return index + 1;
+}
+
 export default {
     TextUtils,
     AgentUtils, 
-    LoadExternelScript
+    LoadExternelScript,
+    CycleIndex
 }

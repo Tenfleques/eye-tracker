@@ -5,6 +5,7 @@ import Modal from "../../Components/Card/modal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {faArrowRight, faArrowLeft} from '@fortawesome/free-solid-svg-icons';
 import VideoCapture from "../../Components/Canvas/VideoCapture";
+import Tracker from "../../Components/Card/Tracker";
 
 const DataCollection = AnimateLoad(class Page extends React.Component {
         constructor(props){
@@ -24,7 +25,7 @@ const DataCollection = AnimateLoad(class Page extends React.Component {
         }
         getSettingsPane(){
             return <>
-                
+                {/* <Tracker /> */}
              </>
         }
         toggleSettingsBar(){
