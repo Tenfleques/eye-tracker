@@ -1,0 +1,17 @@
+{
+  "name": "rest",
+  "version": "1.0.0",
+  "description": "the test backend for the sbora-dannix app. Gets a json of a tracking session and stores in the respective storage ",
+  "main": "index.js",
+  "dependencies": {
+    "body-parser": "1.19.0",
+    "express": "^4.17.1",
+    "express-sse": "^0.5.1",
+    "multer": "^1.4.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Tendai Chikake Mapungwana",
+  "license": "ISC"
+}

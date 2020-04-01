@@ -1,0 +1,9 @@
+[
+    {
+        "caption" : "_appname",
+        "link" : "/"
+    },{
+        "caption" : "_data_capture_page",
+        "link" : "/data_capture"
+    }
+]

@@ -1,10 +1,5 @@
 import cv2
 
-def zigzag(x):
-    return 
-def nextstep(current, step, func):
-    return func()
-
 def main():
     cam = cv2.VideoCapture(0)
 
@@ -15,6 +10,7 @@ def main():
     while True:
         ret, frame = cam.read()
         cv2.imshow("test", frame)
+        
         if not ret:
             break
         k = cv2.waitKey(1)
@@ -33,5 +29,3 @@ def main():
     cam.release()
 
     cv2.destroyAllWindows()
-
-if 
