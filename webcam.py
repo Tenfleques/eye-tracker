@@ -169,9 +169,6 @@ if __name__ == '__main__':
     face_cascade = cv2.CascadeClassifier(hcff)
     eye_cascade = cv2.CascadeClassifier(hce)
 
-    
-
-    # visual()
 
     results = trackcam(args.fps, output, args.cam, args.numframes, args.visualise)
     
