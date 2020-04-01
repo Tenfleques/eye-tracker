@@ -1,10 +1,10 @@
 self.__precacheManifest = (self.__precacheManifest || []).concat([
   {
-    "revision": "08caf2230f7de91df7d348ed0c8c39f4",
+    "revision": "ddb8c2b3f2c0d1e6311e0c72f2222541",
     "url": "/eye-tracker/index.html"
   },
   {
-    "revision": "517037ad7fe752745e2c",
+    "revision": "11fff096803f9a149b38",
     "url": "/eye-tracker/static/css/main.b9ab9fab.chunk.css"
   },
   {
@@ -16,8 +16,8 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/eye-tracker/static/js/2.ab668fe7.chunk.js.LICENSE.txt"
   },
   {
-    "revision": "517037ad7fe752745e2c",
-    "url": "/eye-tracker/static/js/main.8870581c.chunk.js"
+    "revision": "11fff096803f9a149b38",
+    "url": "/eye-tracker/static/js/main.5f22c7bf.chunk.js"
   },
   {
     "revision": "c3dec18d30a7dc5b925e",
