@@ -1,0 +1,66 @@
+#:kivy 1.1.0
+
+Root:
+    gaze_log: gaze_log
+    lbl_output_dir:lbl_output_dir
+    BoxLayout:
+        orientation: 'vertical'
+        BoxLayout:
+            size_hint_y: None
+            height: 50
+            orientation: 'horizontal'
+            valign: 'middle'
+            Label:
+                id:lbl_output_dir
+                text: 'no directory chosen...'
+                color: (0,0,0,1)
+            Button:
+                text: 'Select Output Directory'
+                on_release: root.show_load()
+                size_hint: (None, None)
+                height: '40dp'
+                width: '220dp'
+                padding_y: 5
+            ToggleButton:
+                id: toggle_play
+                text: 'Play'
+                on_press: root.btn_play_click()
+                size_hint: (None, None)
+                height: '40dp'
+                width: '80dp'
+                padding_y: 5
+
+        BoxLayout:
+            Camera:
+                id: camera
+                resolution: (780, 480)
+                play: False
+                on_texture: root.init_tracker()
+            
+            RstDocument:
+                id: gaze_log
+                text: ''
+                show_errors: True
+                size_hint_x: None
+                width: '300dp'
+
+<LoadDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            dirselect: True
+            path: "~"
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Select"
+                on_release: root.load(filechooser.path, filechooser.selection)
