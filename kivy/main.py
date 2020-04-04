@@ -6,6 +6,7 @@ from kivy.properties import ObjectProperty
 from kivy.uix.popup import Popup
 
 from kivy.clock import Clock
+import locale
 
 import os
 import json
@@ -152,6 +153,10 @@ class Root(FloatLayout):
 
     def get_local_str(self, key):
         lang = "ru"
+        sys_locale = locale.getdefaultlocale()[0].split("_")[0]
+        if sys_locale in ["en", "ru"]:
+            lang = sys_locale
+        
         if key in LOCALE:
             return LOCALE.get(key)[lang]
 
