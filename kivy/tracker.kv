@@ -1,0 +1,108 @@
+#:kivy 1.1.0
+
+Root:
+    gaze_log: gaze_log
+    lbl_output_dir:lbl_output_dir
+    app_log: app_log
+
+    BoxLayout:
+        orientation: 'vertical'
+        BoxLayout:
+            size_hint_y: None
+            height: 50
+            orientation: 'horizontal'
+            valign: 'middle'
+            Label:
+                id:lbl_output_dir
+                text: root.get_local_str("_directory_not_selected")
+                color: (0,0,0,1)
+                halign: 'left'
+                valign: 'middle'
+                text_size: self.size
+                padding_x: 10
+            Button:
+                text: root.get_local_str("_select_directory")
+                on_release: root.show_load()
+                size_hint: (None, None)
+                height: '40dp'
+                width: '240dp'
+                padding_y: 5
+            ToggleButton:
+                id: toggle_play
+                text: root.get_local_str("_start")
+                on_press: root.btn_play_click()
+                size_hint: (None, None)
+                height: '40dp'
+                width: '60dp'
+                padding_y: 5
+
+        BoxLayout:
+            Camera:
+                id: camera
+                resolution: (780, 480)
+                play: False
+                on_texture: root.init_tracker()
+            BoxLayout:
+                orientation: 'vertical'
+                width: '300dp'
+                size_hint_x: None
+                Label:
+                    id:lbl_gaze_log
+                    text: root.get_local_str("_records")
+                    color: (0,0,0,1)
+                    size_hint_y: None
+                    height: 30
+                    halign: 'left'
+                    valign: 'middle'
+                    text_size: self.size
+                    font_size: dp(16)
+                    padding_x: 5
+                RstDocument:
+                    id: gaze_log
+                    text: ''
+                    font_size: dp(12)
+                    show_errors: False
+                    halign: 'left'
+                    font_name: 'monospace'
+                Label:
+                    id:lbl_app_log
+                    text: root.get_local_str("_logs")
+                    color: (0,0,0,1)
+                    color: (0,0,0,1)
+                    size_hint_y: None
+                    height: 30
+                    halign: 'left'
+                    valign: 'middle'
+                    text_size: self.size
+                    font_size: dp(16)
+                    padding_x: 5
+                RstDocument:
+                    id: app_log
+                    text: ''
+                    font_size: dp(12)
+                    show_errors: False
+                    halign: 'left'
+                    font_name: 'monospace'
+                
+                
+
+<LoadDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            dirselect: True
+            path: "~"
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: root.get_local_str("_cancel")
+                on_release: root.cancel()
+
+            Button:
+                text: root.get_local_str("_select")
+                on_release: root.load(filechooser.path, filechooser.selection)

@@ -1,0 +1,46 @@
+{
+    "_appname" : {
+        "en" : "",
+        "ru" : ""
+    },
+    "_select_directory": {
+        "en" : "select output directory ...",
+        "ru" : "выберите выходной каталог ..."
+    },
+    "_records": {
+        "en" : "records",
+        "ru" : "отчеты"
+    },
+    "_logs": {
+        "en" : "logs",
+        "ru" : "логи"
+    },
+    "_cancel": {
+        "en" : "cancel",
+        "ru" : "отмена"
+    },
+    "_select": {
+        "en" : "select",
+        "ru" : "выберите"
+    },
+    "_directory_not_selected" : {
+        "en" : "directory not selected",
+        "ru" : "каталог не выбран..."
+    },
+    "_start" : {
+        "en" : "Start",
+        "ru" : "Пуск"
+    },
+    "_stop" : {
+        "en" : "Stop",
+        "ru" : "Стоп"
+    },
+    "_tobii_not_found" : {
+        "en" : "tracker Tobii not found",
+        "ru" : "трейкер Тobii не найден"
+    },
+    "_tobii_subscribed" : {
+        "en" : "no Tobbi records found",
+        "ru" : "Нет записи Трейкер Тobii"
+    }
+}
