@@ -2,4 +2,4 @@ pip
 wheel
 setuptools
 kivy
-ffpyplayer
+ffpyplayerevents

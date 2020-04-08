@@ -35,12 +35,8 @@
         "en" : "Stop",
         "ru" : "Стоп"
     },
-    "_tobii_not_found" : {
-        "en" : "tracker Tobii not found",
-        "ru" : "трейкер Тobii не найден"
-    },
-    "_tobii_subscribed" : {
-        "en" : "no Tobbi records found",
-        "ru" : "Нет записи Трейкер Тobii"
+    "_gaze_device_not_ready" : {
+        "en" : "tracker device not yet ready",
+        "ru" : "трейкер пока не готов"
     }
 }
