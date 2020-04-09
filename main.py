@@ -8,18 +8,19 @@ from kivy.uix.popup import Popup
 from kivy.uix.floatlayout import FloatLayout
 from kivy.properties import ObjectProperty
 from kivy.uix.popup import Popup
-from kivy.clock import Clock
+from kivy.clock import Clock, mainthread
 
 import tobii_research as tr
 
 import os
 import json
 from collections import deque
-import time 
+import time
+import threading 
 from threading import Thread, current_thread
 import sys
 from gaze_listener import LogRecordSocketReceiver
-from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str
+from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str, findClosestGazeFrame, getCSVHeaders, getSessionName
 
 
 from collections import deque
@@ -38,9 +39,29 @@ class LoadDialog(FloatLayout):
 
 
 class Root(FloatLayout):
+    stop = threading.Event()
+    
     def init_listeners(self):
-        self.RECENT_FRAMES = deque({}, 10)
+        self.RECENT_FRAMES = deque({}, 90)
         self.camera = self.ids['camera']
+        self.camera.play = True 
+        self.clock_nano = 0
+        self.control_nano = time.strftime("%H:%M:%S")
+        self.ready_device= False
+        self.session_name = None
+
+        Clock.schedule_interval(self.updateNano,1/100)
+
+    def updateNano(self, r):
+        current = time.strftime("%H:%M:%S")
+        if current == self.control_nano:
+            self.clock_nano += 1
+        else:
+            self.control_nano = current
+            self.clock_nano = 0
+
+        if not self.ready_device:
+            self.eyetracker_ready()
 
     def save_dir_ready(self):
         lbl_output_dir = self.ids['lbl_output_dir']
@@ -53,20 +74,20 @@ class Root(FloatLayout):
             lbl_output_dir.color = (0,0,0,1)
 
         return ready
-    
+
     def eyetracker_ready(self):
         recent_gazes = tcpserver.getTopRecords()
 
-        ready = len(recent_gazes) and recent_gazes[0]
+        self.ready_device= len(recent_gazes) and recent_gazes[0]
 
         error_log = self.get_local_str("_gaze_device_not_ready")
 
-        if not ready:
+        if not self.ready_device:
             self.applog(error_log, WARNING)
         else:
             self.applog(self.get_local_str("_gaze_device_ready"), INFO)
 
-        return ready
+        return self.ready_device
 
     def get_local_str(self, key):
         return get_local_str(key)
@@ -76,29 +97,42 @@ class Root(FloatLayout):
         app_log = self.ids['app_log']
         app_log.text = log
 
-    def btn_play_click(self):
-        toggle_play = self.ids['toggle_play']
-
+    def btn_session_click(self):
         if not self.save_dir_ready():
-            toggle_play.state = 'normal'
+            return 
+
+        session = getSessionName()
+        path = os.sep.join(self.save_path.split(os.sep)[:-1])
+        self.save_path = os.path.join(path,session)
+        os.makedirs(self.save_path, exist_ok=True)
+
+        session_label = self.ids["session_label"]
+        session_label.text = get_local_str("_session") + ": " + session
+        self.initSession()
+
+    def initSession(self):
+        with open(os.path.join(self.save_path, "results.csv"), "w") as f:
+            f.write(getCSVHeaders())
+            f.close()
+
+    def btn_play_click(self):
+        frame = self.camera.export_as_image()
+        gaze_log = self.ids['gaze_log']
+        if not self.save_dir_ready():
             return 
 
         if not self.eyetracker_ready():
-            toggle_play.state = 'normal'
             return
-            
-        if self.camera.play:
-            # next click will subscribe to tracker 
-            toggle_play.text = self.get_local_str('_start')
-            
-        else:
-            # will be subscribing to tracker
-            toggle_play.text = self.get_local_str('_stop')
-        
+
         recent_gazes = tcpserver.getTopRecords()
+        result = findClosestGazeFrame(recent_gazes, time.strftime("%H:%M:%S"), self.clock_nano)
 
-        print(recent_gazes[0].split(",")[0])
-
+        gaze_log.text = result["log"] + gaze_log.text
+        frame.save(os.path.join(self.save_path, result["filename"]))
+        
+        with open(os.path.join(self.save_path, "results.csv"), "a") as f:
+            f.write(result["gaze"])
+            f.close()
 
     def capture(self):
         '''
@@ -120,18 +154,24 @@ class Root(FloatLayout):
 
     def show_load(self):
         content = LoadDialog(load=self.load, cancel=self.dismiss_popup, get_local_str = self.get_local_str)
-        self._popup = Popup(title=self.get_local_str("_select_directory"), content=content,
-                            size_hint=(0.9, 0.9))
+        self._popup = Popup(title=self.get_local_str("_select_directory"), content=content,size_hint=(0.9, 0.9))
         self._popup.open()
 
-    
 
     def load(self, path, filename):
-        self.save_path = path
+        session = getSessionName()
+        self.save_path = os.path.join(path,session)
+        os.makedirs(self.save_path, exist_ok=True)
+        
         lbl_output_dir = self.ids['lbl_output_dir']
-        lbl_output_dir.text = self.save_path
-        self.save_dir_ready()
+        lbl_output_dir.text = path
         self.dismiss_popup()
+
+        self.save_dir_ready()
+        session_label = self.ids["session_label"]
+        session_label.text = get_local_str("_session") + ": " + session
+        self.initSession()
+        
 
 
 class Tracker(App):
@@ -157,7 +197,9 @@ class Tracker(App):
     def on_stop(self):
         self.STOP_THREADS = True
         self.root.camera.play = False
+        self.root.stop.set()
         self.socket_thread.alive = False
+        
         del self.socket_thread
 
         print(props(self))

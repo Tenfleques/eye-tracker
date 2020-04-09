@@ -31,6 +31,18 @@
         "en" : "Start",
         "ru" : "Пуск"
     },
+    "_capture" : {
+        "en" : "Capture",
+        "ru" : "Пуск"
+    },
+    "_reset_session" : {
+        "en" : "new session",
+        "ru" : "новая сеанса"
+    },
+    "_session" : {
+        "en" : "session",
+        "ru" : "сеанса"
+    },
     "_stop" : {
         "en" : "Stop",
         "ru" : "Стоп"

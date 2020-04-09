@@ -1,6 +1,7 @@
 import time 
 import locale 
 import json
+import math
 
 ERROR = 1
 WARNING = 2
@@ -31,26 +32,44 @@ def get_local_str(key):
 
         return LOCALE["__empty"][lang]
 
-def parseGazeLog(record):
-  """decodes the record in the socket to dict"""
-  keys = [
-      {"time": "time"},
-      {"gaze" : [
-          {"left" : ["x", "y"]},
-          {"right" : ["x", "y"]},
-        ],
-      },
-      {"pos" : [
-          {"left" : ["x", "y", "z"]},
-          {"right" : ["x", "y", "z"]},
-        ],
-      },
-      {"flag" : "is_main_gaze"}
-  ]
-  return
+
+def findClosestGazeFrame(gazes, tm, nano):
   
-def findClosestGazeFrame(gazes, frames, time):
-  pass
+  gaze = gazes[0].split(",")
+
+  timestamp = lambda x : time.mktime(time.strptime(x[0], "%H:%M:%S")) + float("0." + x[1])
+
+  ctrl_timestamp = time.mktime(time.strptime(tm, "%H:%M:%S")) + nano/100.0
+  
+  if gaze[0]:
+    diff = math.fabs(ctrl_timestamp - timestamp(gaze))
+
+    for i in range(1,len(gazes)):
+      if gazes[i][0]:
+        arr = gazes[i].split(",")
+        ts = timestamp(arr)
+        pt_diff = math.fabs(ctrl_timestamp - ts)
+        if pt_diff < diff:
+          diff = pt_diff
+          gaze = arr
+
+  str_gaze = gaze[:-1].copy()
+  str_gaze[0] = "\"" + str_gaze[0] + "\""
+
+  for i in range(2,12):
+    gaze[i]=float(gaze[i])
+
+  filename = "capture-{}.png".format("-".join(tm.split(":")))
+
+  result = {
+    "log" : "time: {} gaze nano: {}, ({:.2},{:.2}), ({:.2}, {:.2})\n\n".format(tm, gaze[1], gaze[2], gaze[3], gaze[4], gaze[5]),
+    "gaze" : ",".join(str_gaze) + ",\"" + filename + "\"\n",
+    "filename": filename
+  }
+  return result
+
+def getCSVHeaders():
+      return '''"time","nano_sec","gaze_left_x", "gaze_left_y", "gaze_right_x", "gaze_right_y","pos_left_x", "pos_left_y", "pos_left_z","pos_right_x","pos_right_y", "pos_right_z","is_main_gaze", "image" \n'''
 
 def createlog(text, logtype = INFO):
   str_logtype = {
@@ -58,7 +77,9 @@ def createlog(text, logtype = INFO):
       ERROR : "ERROR",
       WARNING: "WARNING"
   }
-  timestr = time.strftime("%Y/%m/%d %H:%M:%S")
-  
+  # timestr = time.strftime("%Y/%m/%d %H:%M:%S")
   log = "{}: {}".format(str_logtype.get(logtype, INFO), text)
   return log
+
+def getSessionName():
+  return "ets-{}".format(time.strftime("%m_%d_%H_%M_%S"))
