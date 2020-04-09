@@ -61,6 +61,7 @@ class MonSnap:
                             l.pos.x, l.pos.y, l.pos.z,
                             r.pos.x, r.pos.y, r.pos.z,
                             int(main_gaze))
+                            
         message = "".join(message.split())
         self.logPieces(message)
 

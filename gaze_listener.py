@@ -4,7 +4,7 @@ import logging.handlers
 import socketserver
 import struct
 import select
-import time 
+import time
 from threading import Thread, current_thread
 import sys
 
@@ -14,13 +14,10 @@ from collections import deque
 def props(cls):   
   return [i for i in cls.__dict__.keys() if i[:1] != '_']
 
-TOP_LOGS = deque(100*"", 100)
+RECENT_GAZES = deque(100*"", 100)
 
 class LogRecordStreamHandler(socketserver.StreamRequestHandler):
     """Handler for a streaming logging request.
-
-    This basically logs the record using whatever logging policy is
-    configured locally.
     """
 
     def handle(self):
@@ -53,7 +50,7 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
             name = record.name
 
         # print(name, record.getMessage())
-        TOP_LOGS.appendleft(record.getMessage())
+        RECENT_GAZES.appendleft(record.getMessage())
         # logger = logging.getLogger(name)
         # logger.handle(record)
 
@@ -69,29 +66,40 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
                  handler=LogRecordStreamHandler):
 
         socketserver.ThreadingTCPServer.__init__(self, (host, port), handler)
+        
         self.abort = 0
         self.timeout = 1
         self.logname = None
+    def __del__(self):
+        print("self files", self.files)
 
-    def serve_until_stopped(self):
+    def getTopRecords(self):
+        global RECENT_GAZES
+        return RECENT_GAZES
+
+    def serve_until_stopped(self, stop):
         abort = 0
-        print(props(self))
 
-        while not abort:
+        while not abort and not stop():
+            print(stop())
             rd, wr, ex = select.select([self.socket.fileno()],
                                        [], [],
                                        self.timeout)
             if rd:
                 self.handle_request()
             abort = self.abort
+        
+        self.server_close()
+
 
 def main():
     # logging.basicConfig(
     #     format="%(relativeCreated)5d %(name)-15s %(levelname)-8s %(message)s")
     tcpserver = LogRecordSocketReceiver()
     print("About to start TCP server...")
+    socket_thread_alive = True
 
-    socket_thread = Thread(target=tcpserver.serve_until_stopped)
+    socket_thread = Thread(target=tcpserver.serve_until_stopped, args=(lambda : socket_thread_alive, ))
     try:
         # Start the thread
         socket_thread.start()
@@ -99,12 +107,19 @@ def main():
         # while socket_thread.is_alive():
             # Try to join the child thread back to parent for 0.5 seconds
             # socket_thread.join(0.5)
-        for i in range(5):
-            # tcpserver.getTopRecords()
-            print(TOP_LOGS)
-            print("sleeping {}".format(i))
-            time.sleep(5)
+        for i in range(15):
+            TOP_LOGS = tcpserver.getTopRecords()
+            print(RECENT_GAZES)
 
+            if len(TOP_LOGS):
+                print(TOP_LOGS[0].split(",")[0])
+
+            print("sleeping {}".format(i))
+            
+            time.sleep(5)
+        socket_thread.alive = False
+        # Exit with error code
+        sys.exit(0)
     # When ctrl+c is received
     except KeyboardInterrupt as e:
         # Set the alive attribute to false

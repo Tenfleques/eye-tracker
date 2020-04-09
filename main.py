@@ -1,8 +1,13 @@
-from kivy.uix.floatlayout import FloatLayout
+#!/usr/bin/python
+from kivy.app import App
 from kivy.properties import ObjectProperty
 
+from kivy.factory import Factory
 from kivy.uix.popup import Popup
 
+from kivy.uix.floatlayout import FloatLayout
+from kivy.properties import ObjectProperty
+from kivy.uix.popup import Popup
 from kivy.clock import Clock
 
 import tobii_research as tr
@@ -12,7 +17,9 @@ import os
 import json
 from collections import deque
 import time 
-
+from threading import Thread, current_thread
+import sys
+from gaze_listener import LogRecordSocketReceiver
 from helpers import props, createlog, ERROR, WARNING, INFO 
 
 LOCALE = {}
@@ -24,6 +31,14 @@ LOCALE["__empty"] = {
     "en" : ""
 }
 
+from collections import deque
+
+from helpers import props
+from kivy.core.window import Window
+
+Window.clearcolor = (1, 1, 1, 1)
+
+tcpserver = LogRecordSocketReceiver()
 
 class LoadDialog(FloatLayout):
     load = ObjectProperty(None)
@@ -32,8 +47,9 @@ class LoadDialog(FloatLayout):
 
 
 class Root(FloatLayout):
-    def init_impulse_gen(self):
-        self.RECENT_GAZES = deque("", 100)
+    def init_listeners(self):
+        self.RECENT_FRAMES = deque({}, 10)
+        self.camera = self.ids['camera']
 
     def save_dir_ready(self):
         lbl_output_dir = self.ids['lbl_output_dir']
@@ -48,18 +64,17 @@ class Root(FloatLayout):
         return ready
     
     def eyetracker_ready(self):
-        recent_gazes = props(self)
+        recent_gazes = tcpserver.getTopRecords()
 
-        ready = 'RECENT_GAZES' in recent_gazes
+        ready = len(recent_gazes) and recent_gazes[0]
 
         error_log = self.get_local_str("_gaze_device_not_ready")
 
         if not ready:
             self.applog(error_log, WARNING)
-        
-        if not recent_gazes[0]:
-            self.applog(error_log, WARNING)
-        
+        else:
+            self.applog(self.get_local_str("_gaze_device_ready"), INFO)
+
         return ready
 
 
@@ -69,9 +84,8 @@ class Root(FloatLayout):
         app_log.text = log + app_log.text
 
     def btn_play_click(self):
-        camera = self.ids['camera']
         toggle_play = self.ids['toggle_play']
-    
+
         if not self.save_dir_ready():
             toggle_play.state = 'normal'
             return 
@@ -80,15 +94,17 @@ class Root(FloatLayout):
             toggle_play.state = 'normal'
             return
             
-        if camera.play:
+        if self.camera.play:
             # next click will subscribe to tracker 
             toggle_play.text = self.get_local_str('_start')
-            self.capture_up = False
+            
         else:
             # will be subscribing to tracker
             toggle_play.text = self.get_local_str('_stop')
-            
-        camera.play = not camera.play
+        
+        recent_gazes = tcpserver.getTopRecords()
+
+        print(recent_gazes[0].split(",")[0])
 
 
     def capture(self):
@@ -134,3 +150,40 @@ class Root(FloatLayout):
         lbl_output_dir.text = self.save_path
         self.save_dir_ready()
         self.dismiss_popup()
+
+
+class Tracker(App):
+    def build(self):
+        print("building")
+        Factory.register('Root', cls=Root)
+        Factory.register('LoadDialog', cls=LoadDialog)
+
+        self.STOP_THREADS = False
+        print("About to start TCP server...")
+        self.socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
+        # frames_thread = 
+        try:
+            # Start the thread
+            self.socket_thread.start()
+        # When ctrl+c is received
+        except KeyboardInterrupt as e:
+            # Set the alive attribute to false
+            self.socket_thread.alive = False
+            self.socket_thread.join()
+            # Exit with error code
+            
+            # sys.exit(e)
+
+    def on_stop(self):
+        self.STOP_THREADS = True
+        self.root.camera.play = False
+        self.socket_thread.alive = False
+        del self.socket_thread
+
+        print(props(self))
+        sys.exit(0)
+        quit()
+
+if __name__ == '__main__':
+    tracker = Tracker()
+    tracker.run()

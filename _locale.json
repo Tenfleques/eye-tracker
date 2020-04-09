@@ -35,6 +35,10 @@
         "en" : "Stop",
         "ru" : "Стоп"
     },
+    "_gaze_device_ready": {
+        "en" : "tracker device ready",
+        "ru" : "трейкер готов"
+    },
     "_gaze_device_not_ready" : {
         "en" : "tracker device not yet ready",
         "ru" : "трейкер пока не готов"
