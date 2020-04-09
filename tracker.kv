@@ -63,26 +63,21 @@ Root:
                     font_size: dp(12)
                     show_errors: False
                     halign: 'left'
-                    font_name: 'monospace'
-                Label:
-                    id:lbl_app_log
-                    text: root.get_local_str("_logs")
-                    color: (0,0,0,1)
-                    color: (0,0,0,1)
-                    size_hint_y: None
-                    height: 30
-                    halign: 'left'
-                    valign: 'middle'
-                    text_size: self.size
-                    font_size: dp(16)
-                    padding_x: 5
-                RstDocument:
-                    id: app_log
-                    text: ''
-                    font_size: dp(12)
-                    show_errors: False
-                    halign: 'left'
-                    font_name: 'monospace'
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            orientation: 'vertical'
+            Label:
+                id: app_log
+                text: ''
+                show_errors: False
+                size_hint_y: None
+                height: 30
+                halign: 'left'
+                valign: 'middle'
+                padding_x: 5
+                text_size: self.size
+                color: (0,0,0,1)
                 
                 
 

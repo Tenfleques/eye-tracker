@@ -11,7 +11,6 @@ from kivy.uix.popup import Popup
 from kivy.clock import Clock
 
 import tobii_research as tr
-import locale
 
 import os
 import json
@@ -20,16 +19,8 @@ import time
 from threading import Thread, current_thread
 import sys
 from gaze_listener import LogRecordSocketReceiver
-from helpers import props, createlog, ERROR, WARNING, INFO 
+from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str
 
-LOCALE = {}
-with open("_locale.json", "r") as f:
-    LOCALE = json.load(f)
-
-LOCALE["__empty"] = {
-    "ru" : "",
-    "en" : ""
-}
 
 from collections import deque
 
@@ -77,11 +68,13 @@ class Root(FloatLayout):
 
         return ready
 
+    def get_local_str(self, key):
+        return get_local_str(key)
 
     def applog(self, text, logtype = INFO):
         log = createlog(text, logtype)
         app_log = self.ids['app_log']
-        app_log.text = log + app_log.text
+        app_log.text = log
 
     def btn_play_click(self):
         toggle_play = self.ids['toggle_play']
@@ -131,18 +124,7 @@ class Root(FloatLayout):
                             size_hint=(0.9, 0.9))
         self._popup.open()
 
-    def get_local_str(self, key):
-        lang = "ru"
-        local_def = locale.getdefaultlocale()
-        if len(local_def) and local_def[0]:
-           sys_locale = local_def[0].split("_")[0]
-           if sys_locale in ["en", "ru"]:
-               lang = sys_locale
-        
-        if key in LOCALE:
-            return LOCALE.get(key)[lang]
-
-        return LOCALE["__empty"][lang]
+    
 
     def load(self, path, filename):
         self.save_path = path
@@ -170,9 +152,7 @@ class Tracker(App):
             # Set the alive attribute to false
             self.socket_thread.alive = False
             self.socket_thread.join()
-            # Exit with error code
-            
-            # sys.exit(e)
+            sys.exit(e)
 
     def on_stop(self):
         self.STOP_THREADS = True

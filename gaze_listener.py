@@ -79,9 +79,7 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
 
     def serve_until_stopped(self, stop):
         abort = 0
-
         while not abort and not stop():
-            print(stop())
             rd, wr, ex = select.select([self.socket.fileno()],
                                        [], [],
                                        self.timeout)
