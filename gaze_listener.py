@@ -59,7 +59,7 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
 
     allow_reuse_address = 1
     timeout = 3
-    recent_gazes = deque(100*"", 100)
+    recent_gazes = deque(10*"", 10)
     
     def __init__(self, host='localhost',
                  port=logging.handlers.DEFAULT_TCP_LOGGING_PORT,

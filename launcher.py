@@ -40,10 +40,6 @@ class MonSnap:
         self.main_gaze = False
         self.restore_counter = 0
 
-        self.flag_nano_static = time.strftime("%H:%M:%S")
-        self.nano_sec = 0
-        self.precision = 0
-
         return True
     
     def stop(self):
@@ -63,29 +59,19 @@ class MonSnap:
 
         p = (l.gaze + r.gaze) / 2
         main_gaze = -0.02 < p.x < 1.02 and -0.02 < p.y < 1.02 and bool(l or r)
-        
-        this_time = time.strftime("%H:%M:%S")
-        
-        if this_time != self.flag_nano_static:
-            self.flag_nano_static = this_time
-            self.nano_sec = 0
-        else:
-            self.nano_sec += 1 
-        
-        self.precision = max(self.precision, self.nano_sec)
 
-        message = '''{},{},
+        message = '''{},
                     {},{},
                     {},{},
                     {},{},{},
                     {},{},{},
-                    {},{}'''.format(
-                            this_time, self.nano_sec,
+                    {}'''.format(
+                            time.time(),
                             l.gaze.x, l.gaze.y, 
                             r.gaze.x, r.gaze.y,
                             l.pos.x, l.pos.y, l.pos.z,
                             r.pos.x, r.pos.y, r.pos.z,
-                            int(main_gaze), self.precision)
+                            int(main_gaze))
         message = "".join(message.split())
 
         self.flag_nano_static = this_time

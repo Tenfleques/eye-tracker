@@ -14,8 +14,6 @@ from kivy.uix.popup import Popup
 from kivy.clock import Clock, mainthread
 import copy 
 
-import tobii_research as tr
-
 import os
 import json
 from collections import deque
@@ -27,7 +25,7 @@ import sys
 import cv2
 
 from gaze_listener import LogRecordSocketReceiver
-from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str, findClosestGazeFrame, getCSVHeaders, getSessionName, loadService, playVideo, getVideoFPS
+from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str, findClosestGazeFrame, getCSVHeaders, getSessionName, loadService, getVideoFPS
 
 
 from collections import deque
@@ -52,31 +50,22 @@ class Root(FloatLayout):
     stop = threading.Event()
     
     def init_listeners(self):
-        self.RECENT_FRAMES = deque({}, 100)
-        self.clock_nano = 0
-        self.control_nano = time.strftime("%H:%M:%S")
+        self.session_frames = deque()
         self.ready_device= False
         self.session_name = None
         self.initVideo()
-        Clock.schedule_interval(self.updateNano,1/100)
+        self.check_tracker = Clock.schedule_interval(self.updateNano,1/2)
 
-        self.session_log = []
-        if self.get_video_src() and self.save_dir_ready():
-            self.initSession()
 
     def updateNano(self, r):
-        current = time.strftime("%H:%M:%S")
-
-        if current == self.control_nano:
-            self.clock_nano += 1
-        else:
-            self.control_nano = current
-            self.clock_nano = 0
-        self.eyetracker_ready()
+        if self.eyetracker_ready():
+            self.check_tracker.cancel()
 
     def save_dir_ready(self):
         lbl_output_dir = self.ids['lbl_output_dir']
-        ready = 'save_path' in props(self)
+        self.save_path = self.ids['lbl_output_dir'].text
+
+        ready = os.path.isdir(self.save_path)       
         if not ready:
             lbl_output_dir.color = (1,0,0,1)
             self.applog(self.get_local_str("_directory_not_selected"))
@@ -87,15 +76,18 @@ class Root(FloatLayout):
 
     def eyetracker_ready(self):
         recent_gazes = tcpserver.getTopRecords()
+        
         self.ready_device= len(recent_gazes) and recent_gazes[0]
         error_log = self.get_local_str("_gaze_device_not_ready")
         if not self.ready_device:
             self.applog(error_log, WARNING, 'device_log')
         else:
-            current = time.strftime("%H:%M:%S")
-            last_reading = recent_gazes[0].split(",")[0]
+            current = time.time()
+            last_reading = float(recent_gazes[0].split(",")[0])
             
-            time_diff = time.mktime(time.strptime(current, "%H:%M:%S")) - time.mktime(time.strptime(last_reading, "%H:%M:%S"))
+            time_diff = current - last_reading
+
+
             if time_diff > 2:
                 self.applog(self.get_local_str("_gaze_device_out_of_sync"), INFO, 'device_log')
                 return False
@@ -112,38 +104,87 @@ class Root(FloatLayout):
         app_log = self.ids[loglabel]
         app_log.text = log
 
-    def btn_session_click(self):
-        if not self.save_dir_ready():
-            return 
-
-        self.initSession()
 
     def initSession(self):
-        self.session_log = []
         self.session_name = getSessionName()
+        self.session_frames = deque()
         session_label = self.ids["session_label"]
         session_label.text = get_local_str("_session") + ": " + self.session_name
 
+        os.makedirs(os.path.join(self.save_path, self.session_name), exist_ok=True)
         with open(os.path.join(self.save_path, "results-{}.csv".format(self.session_name)), "w") as f:
             f.write(getCSVHeaders())
             f.close()
 
+    def getImageFilename(self, x): 
+        return os.path.join(self.save_path, 
+            "{}{}frame-{}.png".format(self.session_name,os.sep, x))
+
+    def btn_play_click(self):
+        if not self.eyetracker_ready():
+            return
+        if not self.save_dir_ready():
+            return
+
+        if self.ids['lbl_src_video'].text:
+            if not self.video_play == None:
+                self.video_play.cancel()
+                # self.ids["camera"].play = False
+                self.initVideo()
+            else:
+                # self.ids["camera"].play = True
+                self.ids['gaze_log'].text = ""
+                self.playVideo()
+        else:
+            self.applog(self.get_local_str("_load_stimuli_video"))
+
     def initVideo(self):
         self.video_player = self.ids['video_player']
         self.video_play = None
-        self.ids['video_player']
-        self.capture = cv2.VideoCapture(self.ids['lbl_src_video'].text)
+        
         self.ids["btn_capture"].text = self.get_local_str("_start")
         self.frame_id = 0
-        self.video_update(None)
+
+        if self.ids['lbl_src_video'].text:
+            self.capture = cv2.VideoCapture(self.ids['lbl_src_video'].text)
+            if self.capture.isOpened():
+                self.video_update(None)
+            
+    def playVideo(self):
+        if "capture" in props(self):
+            self.ids['gaze_log'].text = ""
+            
+            fps = self.capture.get(cv2.CAP_PROP_FPS)
+            if self.ids["txt_box_capture_rate"].text:
+                if not self.ids["chkbx_use_video_fps"].active:
+                    fps = float(self.ids["txt_box_capture_rate"].text)
+            
+            self.ids["txt_box_capture_rate"].text = str(fps)
+
+            if self.capture.isOpened() and fps:
+                self.initSession()
+                delay = 1/fps
+                self.ids["btn_capture"].text = self.get_local_str("_stop")
+                self.video_play = Clock.schedule_interval(self.video_update, delay)
+                self.applog("")
+            else:
+                self.applog(self.get_local_str("_video_error"))
 
     def video_update(self, dt):
         ret, frame = self.capture.read()
         # convert it to texture
         if not ret:
-            self.video_play.cancel()
+            if not self.video_play == None:
+                self.video_play.cancel()
+
+            # self.ids["camera"].play = False
             self.initVideo()
         else:
+            if not dt == None:
+                self.record(self.frame_id)
+                self.frame_id += 1
+                
+
             buf1 = cv2.flip(frame, 0)
             buf = buf1.tostring()
             texture1 = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr') 
@@ -151,62 +192,30 @@ class Root(FloatLayout):
             texture1.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
             # display image from the texture
             self.video_player.texture = texture1
-            if not dt == None:
-                self.record(self.frame_id)
-                self.frame_id += 1
-
-    def playVideo(self):
-        if "capture" in props(self):
-            self.ids['gaze_log'].text = ""
-            self.ids["btn_capture"].text = self.get_local_str("_stop")
-            
-            fps = self.capture.get(cv2.CAP_PROP_FPS)
-            # if self.ids["txt_box_capture_rate"].text:
-            #     fps = float(self.ids["txt_box_capture_rate"].text)
-            # else:
-            #     self.ids["txt_box_capture_rate"].text = str(fps)
-
-            delay = 1/fps   
-            self.video_play = Clock.schedule_interval(self.video_update, delay)
-
-    def btn_play_click(self):
-        if not self.eyetracker_ready():
-            return
-
-        if self.ids['lbl_src_video'].text:
-            if not self.video_play == None:
-                self.video_play.cancel()
-                self.initVideo()
-            else:
-                self.playVideo()
-
-    def btn_save_session_click(self):
-        if not self.save_dir_ready():
-            return
-
-        with open(os.path.join(self.save_path, "results-{}.csv".format(self.session_name)), "a") as f:
-            for log in self.session_log:
-                f.write(log["gaze"] + "\n")
-            f.close()
-
-        self.applog(self.get_local_str("_session_saved"))
 
     def record(self, frame_id):
         '''
-            get the closest video image
-            with the closest respective gaze record, 
-            and respective signal data 
+            capture camera image
+            get the video frame
+            with the closest respective gaze record,
             and give them the names according to their captured time and date and record all to file and log.
         '''
-        # get the top gaze data, find the record whose time closest or equal to call time. 
-        recent_gazes = tcpserver.getTopRecords()
+        # get the top gaze data, find the record whose time closest or equal to call time.
+        tm = time.time()
+        frame = self.ids["camera"].export_as_image()
+        recent_gazes = copy.copy(tcpserver.getTopRecords())
+        
         # get top frames, find the frame whose time closest or equal to call time. 
         # # save the respective data, signal data, gaze data, frame data in thread with save_capture_cb as callback
-        result = findClosestGazeFrame(copy.copy(recent_gazes), frame_id, self.control_nano, self.clock_nano)
+
+        result = findClosestGazeFrame(recent_gazes, frame_id, tm)
+        frame.save(self.getImageFilename(frame_id))
 
         self.ids['gaze_log'].text = result["log"] + self.ids['gaze_log'].text
 
-        self.session_log.append(result)
+        with open(os.path.join(self.save_path, "results-{}.csv".format(self.session_name)), "a") as f:
+            f.write(result["gaze"] + "," + self.ids['lbl_src_video'].text +"\n")
+            f.close()
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -228,11 +237,13 @@ class Root(FloatLayout):
         lbl_src_video = self.ids['lbl_src_video']
         video_path = ""
         if len(filenames):
-            video_path = os.path.join(path, filenames[0])
+            if not filenames[0] == path:
+                video_path = os.path.join(path, filenames[0])
+    
+                self.ids["txt_box_capture_rate"].text = str(getVideoFPS(video_path))
+                lbl_src_video.text = video_path
+                self.initVideo()
         
-        self.ids["txt_box_capture_rate"].text = str(getVideoFPS(video_path))
-        lbl_src_video.text = video_path
-        self.initVideo()
         self.dismiss_popup()
 
     def load(self, path, filename):
@@ -243,7 +254,6 @@ class Root(FloatLayout):
 
         self.save_dir_ready()
         self.applog(self.get_local_str("_save_directory_set"))
-        self.initSession()
 
 
 class Tracker(App):

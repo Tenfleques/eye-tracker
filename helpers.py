@@ -51,45 +51,42 @@ def get_local_str(key):
 def previewQueues(gazes, ctrl_timestamp):
   import pandas as pd
   df_series = {
-    "gazes":  [str(timestamp(x.split(","))) for x in copy.copy(gazes)],
-    "const" : [str(ctrl_timestamp) for i in gazes]
+    "gazes":  [str(x.split(",")[0]) for x in gazes],
+    "capture time" : [str(ctrl_timestamp) for i in gazes]
   }
   df = pd.DataFrame(df_series)
-  print(df.head(20))
+  print(df.tail(30))
 
-def findClosestGazeFrame(gazes, frame_id, tm, nano):
-  # (copy.copy(recent_gazes), frame_id, self.control_nano, self.clock_nano, self.save_capture_cb)
+def findClosestGazeFrame(gazes, frame_id, tm):
   gaze = gazes[0].split(",")
-  ctrl_timestamp = time.mktime(time.strptime(tm, "%H:%M:%S")) + nano/100.0
-  # previewQueues(gazes, ctrl_timestamp)  
+  # previewQueues(gazes, tm)  
   
+  diff = 0.0
   if gaze[0]:
-    diff = math.fabs(ctrl_timestamp - timestamp(gaze))
-
+    diff = math.fabs(tm - float(gaze[0]))
+  
     for i in range(1,len(gazes)):
       if gazes[i][0]:
         arr = gazes[i].split(",")
-        ts = timestamp(arr)
-        pt_diff = math.fabs(ctrl_timestamp - ts)
+        pt_diff = math.fabs(tm - float(arr[0]))
 
         if pt_diff < diff:
           diff = pt_diff
           gaze = arr
 
-  str_gaze = gaze[1:-1].copy()
-  str_gaze[0] = str(frame_id)
+  str_gaze = [str(frame_id)] + gaze
 
   for i in range(1,12):
     gaze[i]=float(gaze[i])
 
   result = {
-    "log" : "frame {}: ({:.2},{:.2}), ({:.2}, {:.2})\n\n".format(str_gaze[0], gaze[2], gaze[3], gaze[4], gaze[5]),
+    "log" : "frame {}: \t ({:.2},{:.2}), \t ({:.2}, {:.2}), \t acc: {:.4}\n\n".format(str_gaze[0], gaze[1], gaze[2], gaze[3], gaze[4], diff),
     "gaze" : ",".join(str_gaze)
   }
   return result
 
 def getCSVHeaders():
-      return '''"frame","gaze_left_x", "gaze_left_y", "gaze_right_x", "gaze_right_y","pos_left_x", "pos_left_y", "pos_left_z","pos_right_x","pos_right_y", "pos_right_z","is_main_gaze", "video" \n'''
+      return '"frame","timestamp","gaze_left_x","gaze_left_y","gaze_right_x","gaze_right_y","pos_left_x","pos_left_y","pos_left_z","pos_right_x","pos_right_y","pos_right_z","is_main_gaze","video" \n'
 
 def createlog(text, logtype = INFO):
   str_logtype = {
@@ -98,7 +95,9 @@ def createlog(text, logtype = INFO):
       WARNING: "WARNING"
   }
   # timestr = time.strftime("%Y/%m/%d %H:%M:%S")
-  log = "{}: {}".format(str_logtype.get(logtype, INFO), text)
+  log = ""
+  if text:
+    log = "{}: {}".format(str_logtype.get(logtype, INFO), text)
   return log
 
 def getSessionName():

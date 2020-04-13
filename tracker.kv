@@ -31,8 +31,10 @@ Root:
     lbl_src_video: lbl_src_video
     view_stage: view_stage
     camera: camera
-    id : video_player
+    video_player : video_player
     txt_box_capture_rate: txt_box_capture_rate
+    lbl_fps_in_use: lbl_fps_in_use
+    chkbx_use_video_fps: chkbx_use_video_fps
 
     BoxLayout:
         orientation: 'vertical'
@@ -42,15 +44,17 @@ Root:
                 orientation: 'vertical'
                 id: main
                 size_hint_x: .65 
+                padding: [5, 5, 5, 5]
                 GridLayout:
-                    rows: 2
+                    rows: 1
                     cols: 2
                     size_hint_y: None
-                    height:'80dp'
+                    height:40
                     id: file_ops
                     Label:
                         id:lbl_output_dir
                         text: root.get_local_str("_directory_not_selected")
+                        # text: './sample'
                         color: (0,0,0,1)
                         halign: 'left'
                         valign: 'middle'
@@ -65,9 +69,16 @@ Root:
                         height: '30dp'
                         width: '220dp'
                         padding_y: 5
+                GridLayout:
+                    rows: 1
+                    cols: 2
+                    size_hint_y: None
+                    height: 40
+                    id: file_ops
                     Label:
                         id:lbl_src_video
-                        text: './stimulus_sample.mp4'
+                        text: root.get_local_str("_load_stimuli_video")
+                        # text: './stimulus_sample.mp4'
                         color: (0,0,0,1)
                         halign: 'left'
                         valign: 'middle'
@@ -88,8 +99,7 @@ Root:
                     Camera:
                         id: camera
                         resolution: (780, 480)
-                        play: False
-                        show: False
+                        play: True
                         # on_texture: root.init_listeners()
                     Image:
                         id : video_player
@@ -98,44 +108,65 @@ Root:
                 id: tools_pane
                 size_hint_x: .35
                 cols: 1
-                Label:
-                    text: root.get_local_str("_impulse_frequency")
-                    show_errors: False
+                padding: [5, 5, 5, 5]
+                GridLayout:
+                    cols: 2
                     size_hint_y: None
-                    height: 0
-                    halign: 'left'
-                    valign: 'top'
-                    padding_x: 5
-                    padding_y: 5
-                    text_size: self.size
-                    color: (0,0,0,1)
+                    height: 40
+                    Label:
+                        text: root.get_local_str("_frequency_in_use")
+                        show_errors: False
+                        size_hint_y: None
+                        height: 30
+                        halign: 'left'
+                        valign: 'top'
+                        padding_x: 5
+                        padding_y: 5
+                        text_size: self.size
+                        color: (0,0,0,1)
+                    Label:
+                        text: root.txt_box_capture_rate.text
+                        id: lbl_fps_in_use
+                        show_errors: False
+                        size_hint_y: None
+                        height: 30
+                        halign: 'left'
+                        valign: 'top'
+                        padding_x: 5
+                        padding_y: 5
+                        text_size: self.size
+                        color: (0,0,0,1)
                 FloatInput:
                     id: txt_box_capture_rate
                     size_hint: (.9, None)
-                    height: 0
+                    height: 30
                     multiline:False
                 GridLayout:
-                    cols: 4
+                    cols: 2
+                    size_hint: (.9, None)
+                    height: 40
+                    Label:
+                        text: root.get_local_str("_use_video_freq")
+                        show_errors: False
+                        size_hint_y: None
+                        height: 30
+                        halign: 'left'
+                        valign: 'top'
+                        padding_x: 5
+                        padding_y: 5
+                        text_size: self.size
+                        color: (0,0,0,1)
+                    CheckBox:
+                        id: chkbx_use_video_fps
+                        active: True
+                        size_hint_y: None
+                        height: 30
+                GridLayout:
+                    cols: 1
                     size_hint: (1,None)
-                    height: '40dp'
+                    height: '50dp'
                     padding_y: 5
                     margin_y: 5
-                    # Button:
-                    #     id: btn_capture
-                    #     text: root.get_local_str("_video_fps")
-                    #     # on_release: root.btn_set_auto_impulse_freq_click()
-                    #     size_hint: (None, None)
-                    #     height: '30dp'
-                    #     width: '80dp'
-                    #     padding_y: 5
-                    Button:
-                        text: root.get_local_str("_reset_session")
-                        on_release: root.btn_session_click()
-                        size_hint: (None, None)
-                        height: '30dp'
-                        width: '100dp'
-                        padding_y: 5
-                        halign: 'right'
                     Button:
                         id: btn_capture
                         text: root.get_local_str("_start")
@@ -144,14 +175,7 @@ Root:
                         height: '30dp'
                         width: '80dp'
                         padding_y: 5
-                    Button:
-                        id: btn_save_session
-                        text: root.get_local_str("_save")
-                        on_release: root.btn_save_session_click()
-                        size_hint: (None, None)
-                        height: '30dp'
-                        width: '80dp'
-                        padding_y: 5
+                        halign: 'right'
                 Label:
                     id:lbl_gaze_log
                     text: root.get_local_str("_log")
