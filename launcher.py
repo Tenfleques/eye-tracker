@@ -1,4 +1,6 @@
-# this file is to be copied to the ~./talon/user directory to monitor the gaze 
+from talon.voice import talon
+from talon import app
+
 from talon import ctrl, tap, ui
 from talon_plugins.eye_mouse import tracker, mouse
 from talon.track.geom import Point2d, Point3d, EyeFrame
@@ -10,8 +12,6 @@ import glob
 import logging
 import logging.handlers
 
-# LOG_FILENAME = './logs/gaze.log'
-
 main = ui.main_screen()
 
 def is_on_main(p):
@@ -20,9 +20,6 @@ def is_on_main(p):
 
 class MonSnap:
     def __init__(self):
-        tap.register(tap.MMOVE, self.on_move)
-        tracker.register('gaze', self.on_gaze)
-
         self.gaze_logger = logging.getLogger('gaze_logger')
         self.gaze_logger.setLevel(logging.INFO)
 
@@ -30,7 +27,14 @@ class MonSnap:
                     logging.handlers.DEFAULT_TCP_LOGGING_PORT)
 
         self.gaze_logger.addHandler(socketHandler)
+    
+    def start(self):
+        if not tracker:
+            return False
 
+        tap.register(tap.MMOVE, self.on_move)
+        tracker.register('gaze', self.on_gaze)
+        
         self.saved_mouse = None
         self.main_mouse = False
         self.main_gaze = False
@@ -40,7 +44,13 @@ class MonSnap:
         self.nano_sec = 0
         self.precision = 0
 
-        os.makedirs("./logs", exist_ok=True)
+        return True
+    
+    def stop(self):
+        if tracker:
+            tracker.unregister('gaze', self.on_gaze)
+            tap.unregister(tap.MMOVE, self.on_move)
+        return 
 
     def logPieces(self,m):
         """Used to check contents of a variable in the test.log files """
@@ -79,7 +89,6 @@ class MonSnap:
         message = "".join(message.split())
 
         self.flag_nano_static = this_time
-        self.logPieces(message)
 
         self.gaze_logger.info(message)
 
@@ -106,5 +115,30 @@ class MonSnap:
             self.saved_mouse = p
         self.main_mouse = on_main
 
-snap = MonSnap()
+class EyeTracker:
+    def __init__(self):
+        self.active = False
+
+        self.menu = app.menu.item('Ай Трекер', weight=3000, checked=self.active, cb=self.toggleTracker)
+
+        # self.gaze_logger.addHandler(socketHandler)
+
+        self.track_monitor = MonSnap()
+    
+    def toggleTracker(self, inf):
+        self.active = not self.active
+        self.menu.checked = self.active
+        if self.active:
+            if self.track_monitor.start():
+                app.notify('Ай Трекер',
+                'Ай Трекер активный', sound=False)
+            else:
+                self.active = False
+                self.menu.checked = False
+        else: 
+            self.track_monitor.stop()
+menu = EyeTracker()
+
+
+
 

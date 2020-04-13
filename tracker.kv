@@ -1,68 +1,163 @@
 #:kivy 1.1.0
+<BackgroundColor@Widget>
+    background_color: 1, 1, 1, 1
+    canvas.before:
+        Color:
+            rgba: root.background_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+            
+<BackgroundBoxLayout@BoxLayout+BackgroundColor>
+    background_color: 1, 1, 1, 1
+
+<BackgroundLabel@Label+BackgroundColor>
+    background_color: 1, 1, 1, 1
+
+<-VideoImage>:
+    canvas:
+        Color:
+            rgb: (1, 1, 1)
+        Rectangle:
+            texture: self.texture
 
 Root:
     gaze_log: gaze_log
     lbl_output_dir:lbl_output_dir
     app_log: app_log
+    device_log: device_log
     btn_capture: btn_capture
     session_label: session_label
+    lbl_src_video: lbl_src_video
+    view_stage: view_stage
+    camera: camera
+    id : video_player
+    txt_box_capture_rate: txt_box_capture_rate
 
     BoxLayout:
         orientation: 'vertical'
         BoxLayout:
-            size_hint_y: None
-            height: 50
             orientation: 'horizontal'
-            valign: 'middle'
-            Label:
-                id:lbl_output_dir
-                text: root.get_local_str("_directory_not_selected")
-                color: (0,0,0,1)
-                halign: 'left'
-                valign: 'middle'
-                text_size: self.size
-                padding_x: 10
-            Button:
-                text: root.get_local_str("_select_directory")
-                on_release: root.show_load()
-                size_hint: (None, None)
-                height: '30dp'
-                width: '220dp'
-                padding_y: 5
-            Button:
-                id: btn_capture
-                text: root.get_local_str("_capture")
-                on_release: root.btn_play_click()
-                size_hint: (None, None)
-                height: '30dp'
-                width: '80dp'
-                padding_y: 5
-
-            # ToggleButton:
-            #     id: toggle_play
-            #     text: root.get_local_str("_start")
-            #     on_press: root.btn_play_click()
-            #     size_hint: (None, None)
-            #     height: '30dp'
-            #     width: '60dp'
-            #     padding_y: 5
-
-        BoxLayout:
-            Camera:
-                id: camera
-                resolution: (780, 480)
-                play: True
-                on_texture: root.init_listeners()
             BoxLayout:
                 orientation: 'vertical'
-                width: '300dp'
-                size_hint_x: None
+                id: main
+                size_hint_x: .65 
+                GridLayout:
+                    rows: 2
+                    cols: 2
+                    size_hint_y: None
+                    height:'80dp'
+                    id: file_ops
+                    Label:
+                        id:lbl_output_dir
+                        text: root.get_local_str("_directory_not_selected")
+                        color: (0,0,0,1)
+                        halign: 'left'
+                        valign: 'middle'
+                        height: '30dp'
+                        size_hint_y: None
+                        text_size: self.size
+                        padding_x: 10
+                    Button:
+                        text: root.get_local_str("_select_directory")
+                        on_release: root.show_load()
+                        size_hint: (None, None)
+                        height: '30dp'
+                        width: '220dp'
+                        padding_y: 5
+                    Label:
+                        id:lbl_src_video
+                        text: './stimulus_sample.mp4'
+                        color: (0,0,0,1)
+                        halign: 'left'
+                        valign: 'middle'
+                        height: '30dp'
+                        size_hint_y: None
+                        text_size: self.size
+                        padding_x: 10
+                    Button:
+                        text: root.get_local_str("_select_src_video")
+                        on_release: root.show_load_video()
+                        size_hint: (None, None)
+                        height: '30dp'
+                        width: '220dp'
+                        padding_y: 5
+                FloatLayout:
+                    id: view_stage
+                    size_hint_y: 1
+                    Camera:
+                        id: camera
+                        resolution: (780, 480)
+                        play: False
+                        show: False
+                        # on_texture: root.init_listeners()
+                    Image:
+                        id : video_player
+                        size_hint: (1, 1)
+            GridLayout:
+                id: tools_pane
+                size_hint_x: .35
+                cols: 1
+                Label:
+                    text: root.get_local_str("_impulse_frequency")
+                    show_errors: False
+                    size_hint_y: None
+                    height: 0
+                    halign: 'left'
+                    valign: 'top'
+                    padding_x: 5
+                    padding_y: 5
+                    text_size: self.size
+                    color: (0,0,0,1)
+                FloatInput:
+                    id: txt_box_capture_rate
+                    size_hint: (.9, None)
+                    height: 0
+                    multiline:False
+                GridLayout:
+                    cols: 4
+                    size_hint: (1,None)
+                    height: '40dp'
+                    padding_y: 5
+                    margin_y: 5
+                    # Button:
+                    #     id: btn_capture
+                    #     text: root.get_local_str("_video_fps")
+                    #     # on_release: root.btn_set_auto_impulse_freq_click()
+                    #     size_hint: (None, None)
+                    #     height: '30dp'
+                    #     width: '80dp'
+                    #     padding_y: 5
+                    Button:
+                        text: root.get_local_str("_reset_session")
+                        on_release: root.btn_session_click()
+                        size_hint: (None, None)
+                        height: '30dp'
+                        width: '100dp'
+                        padding_y: 5
+                        halign: 'right'
+                    Button:
+                        id: btn_capture
+                        text: root.get_local_str("_start")
+                        on_release: root.btn_play_click()
+                        size_hint: (None, None)
+                        height: '30dp'
+                        width: '80dp'
+                        padding_y: 5
+                    Button:
+                        id: btn_save_session
+                        text: root.get_local_str("_save")
+                        on_release: root.btn_save_session_click()
+                        size_hint: (None, None)
+                        height: '30dp'
+                        width: '80dp'
+                        padding_y: 5
                 Label:
                     id:lbl_gaze_log
-                    text: root.get_local_str("_records")
+                    text: root.get_local_str("_log")
                     color: (0,0,0,1)
                     size_hint_y: None
-                    height: 30
+                    height: '30dp'
                     halign: 'left'
                     valign: 'middle'
                     text_size: self.size
@@ -74,49 +169,44 @@ Root:
                     font_size: dp(12)
                     show_errors: False
                     halign: 'left'
-        BoxLayout:
-            size_hint_y: None
-            height: 30
+                    color: (0,0,0,1)
+                    background_color: (1, 1, 1, 1)
+        
+        BackgroundBoxLayout:
             orientation: 'horizontal'
-            padding_y: 5
+            size_hint_y: None
+            height:'30dp'
+            background_color: (0, .196, .313, 1)
             Label:
-                id: app_log
+                id: device_log
                 text: ''
                 show_errors: False
                 size_hint_y: None
-                height: 30
                 halign: 'left'
                 valign: 'bottom'
                 padding_x: 5
                 padding_y: 5
                 text_size: self.size
-                color: (0,0,0,1)
-            BoxLayout:
-                orientation: 'horizontal'
-                width: '500dp'
-                size_hint_x: None
-                Label:
-                    id: session_label
-                    text: ''
-                    show_errors: False
-                    size_hint_y: None
-                    height: 30
-                    halign: 'right'
-                    valign: 'bottom'
-                    text_size: self.size
-                    padding_x: 5
-                    padding_y: 5
-                    color: (0,0,0,1)
-                Button:
-                    text: root.get_local_str("_reset_session")
-                    on_release: root.btn_session_click()
-                    size_hint: (None, None)
-                    height: '30dp'
-                    width: '120dp'
-                    padding_y: 5
-                    margin_y: 5
-                
-                
+            Label:
+                id: app_log
+                text: ''
+                show_errors: False
+                size_hint_y: None
+                halign: 'left'
+                valign: 'bottom'
+                padding_x: 5
+                padding_y: 5
+                text_size: self.size
+            Label:
+                id: session_label
+                text: root.get_local_str("_session_not_set")
+                show_errors: False
+                size_hint_y: None
+                halign: 'right'
+                valign: 'bottom'
+                text_size: self.size
+                padding_x: 5
+                padding_y: 5
 
 <LoadDialog>:
     BoxLayout:
