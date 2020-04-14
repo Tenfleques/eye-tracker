@@ -1,0 +1,254 @@
+#:kivy 1.1.0
+<BackgroundColor@Widget>
+    background_color: 1, 1, 1, 1
+    canvas.before:
+        Color:
+            rgba: root.background_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+            
+<BackgroundBoxLayout@BoxLayout+BackgroundColor>
+    background_color: 1, 1, 1, 1
+
+<BackgroundLabel@Label+BackgroundColor>
+    background_color: 1, 1, 1, 1
+
+<-VideoImage>:
+    canvas:
+        Color:
+            rgb: (1, 1, 1)
+        Rectangle:
+            texture: self.texture
+
+Root:
+    gaze_log: gaze_log
+    lbl_output_dir:lbl_output_dir
+    app_log: app_log
+    device_log: device_log
+    btn_capture: btn_capture
+    session_label: session_label
+    lbl_src_video: lbl_src_video
+    view_stage: view_stage
+    camera: camera
+    video_player : video_player
+    txt_box_capture_rate: txt_box_capture_rate
+    lbl_fps_in_use: lbl_fps_in_use
+    chkbx_use_video_fps: chkbx_use_video_fps
+
+    BoxLayout:
+        orientation: 'vertical'
+        BoxLayout:
+            orientation: 'horizontal'
+            BoxLayout:
+                orientation: 'vertical'
+                id: main
+                size_hint_x: .65 
+                padding: [5, 5, 5, 5]
+                GridLayout:
+                    rows: 1
+                    cols: 2
+                    size_hint_y: None
+                    height:40
+                    id: file_ops
+                    Label:
+                        id:lbl_output_dir
+                        text: root.get_local_str("_directory_not_selected")
+                        # text: './sample'
+                        color: (0,0,0,1)
+                        halign: 'left'
+                        valign: 'middle'
+                        height: '30dp'
+                        size_hint_y: None
+                        text_size: self.size
+                        padding_x: 10
+                    Button:
+                        text: root.get_local_str("_select_directory")
+                        on_release: root.show_load()
+                        size_hint: (None, None)
+                        height: '30dp'
+                        width: '220dp'
+                        padding_y: 5
+                GridLayout:
+                    rows: 1
+                    cols: 2
+                    size_hint_y: None
+                    height: 40
+                    id: file_ops
+                    Label:
+                        id:lbl_src_video
+                        text: root.get_local_str("_load_stimuli_video")
+                        # text: './stimulus_sample.mp4'
+                        color: (0,0,0,1)
+                        halign: 'left'
+                        valign: 'middle'
+                        height: '30dp'
+                        size_hint_y: None
+                        text_size: self.size
+                        padding_x: 10
+                    Button:
+                        text: root.get_local_str("_select_src_video")
+                        on_release: root.show_load_video()
+                        size_hint: (None, None)
+                        height: '30dp'
+                        width: '220dp'
+                        padding_y: 5
+                FloatLayout:
+                    id: view_stage
+                    size_hint_y: 1
+                    Camera:
+                        id: camera
+                        resolution: (780, 480)
+                        play: True
+                        # on_texture: root.init_listeners()
+                    Image:
+                        id : video_player
+                        size_hint: (1, 1)
+            GridLayout:
+                id: tools_pane
+                size_hint_x: .35
+                cols: 1
+                padding: [5, 5, 5, 5]
+                GridLayout:
+                    cols: 2
+                    size_hint_y: None
+                    height: 40
+                    Label:
+                        text: root.get_local_str("_frequency_in_use")
+                        show_errors: False
+                        size_hint_y: None
+                        height: 30
+                        halign: 'left'
+                        valign: 'top'
+                        padding_x: 5
+                        padding_y: 5
+                        text_size: self.size
+                        color: (0,0,0,1)
+                    Label:
+                        text: root.txt_box_capture_rate.text
+                        id: lbl_fps_in_use
+                        show_errors: False
+                        size_hint_y: None
+                        height: 30
+                        halign: 'left'
+                        valign: 'top'
+                        padding_x: 5
+                        padding_y: 5
+                        text_size: self.size
+                        color: (0,0,0,1)
+                FloatInput:
+                    id: txt_box_capture_rate
+                    size_hint: (.9, None)
+                    height: 30
+                    multiline:False
+                GridLayout:
+                    cols: 2
+                    size_hint: (.9, None)
+                    height: 40
+                    Label:
+                        text: root.get_local_str("_use_video_freq")
+                        show_errors: False
+                        size_hint_y: None
+                        height: 30
+                        halign: 'left'
+                        valign: 'top'
+                        padding_x: 5
+                        padding_y: 5
+                        text_size: self.size
+                        color: (0,0,0,1)
+                    CheckBox:
+                        id: chkbx_use_video_fps
+                        active: True
+                        size_hint_y: None
+                        height: 30
+                GridLayout:
+                    cols: 1
+                    size_hint: (1,None)
+                    height: '50dp'
+                    padding_y: 5
+                    margin_y: 5
+                    Button:
+                        id: btn_capture
+                        text: root.get_local_str("_start")
+                        on_release: root.btn_play_click()
+                        size_hint: (None, None)
+                        height: '30dp'
+                        width: '80dp'
+                        padding_y: 5
+                        halign: 'right'
+                Label:
+                    id:lbl_gaze_log
+                    text: root.get_local_str("_log")
+                    color: (0,0,0,1)
+                    size_hint_y: None
+                    height: '30dp'
+                    halign: 'left'
+                    valign: 'middle'
+                    text_size: self.size
+                    font_size: dp(16)
+                    padding_x: 5
+                RstDocument:
+                    id: gaze_log
+                    text: ''
+                    font_size: dp(12)
+                    show_errors: False
+                    halign: 'left'
+                    color: (0,0,0,1)
+                    background_color: (1, 1, 1, 1)
+        
+        BackgroundBoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: None
+            height:'30dp'
+            background_color: (0, .196, .313, 1)
+            Label:
+                id: device_log
+                text: ''
+                show_errors: False
+                size_hint_y: None
+                halign: 'left'
+                valign: 'bottom'
+                padding_x: 5
+                padding_y: 5
+                text_size: self.size
+            Label:
+                id: app_log
+                text: ''
+                show_errors: False
+                size_hint_y: None
+                halign: 'left'
+                valign: 'bottom'
+                padding_x: 5
+                padding_y: 5
+                text_size: self.size
+            Label:
+                id: session_label
+                text: root.get_local_str("_session_not_set")
+                show_errors: False
+                size_hint_y: None
+                halign: 'right'
+                valign: 'bottom'
+                text_size: self.size
+                padding_x: 5
+                padding_y: 5
+
+<LoadDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            dirselect: True
+            path: "~"
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: root.get_local_str("_cancel")
+                on_release: root.cancel()
+
+            Button:
+                text: root.get_local_str("_select")
+                on_release: root.load(filechooser.path, filechooser.selection)
