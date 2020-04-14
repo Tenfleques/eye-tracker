@@ -74,8 +74,6 @@ class MonSnap:
                             int(main_gaze))
         message = "".join(message.split())
 
-        self.flag_nano_static = this_time
-
         self.gaze_logger.info(message)
 
         if self.main_gaze and self.main_mouse and not main_gaze:
@@ -124,7 +122,3 @@ class EyeTracker:
         else: 
             self.track_monitor.stop()
 menu = EyeTracker()
-
-
-
-

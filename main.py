@@ -24,8 +24,8 @@ import sys
 
 import cv2
 
-from gaze_listener import LogRecordSocketReceiver
-from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str, findClosestGazeFrame, getCSVHeaders, getSessionName, loadService, getVideoFPS
+from gaze_listener import LogRecordSocketReceiver, WindowsGazeListener
+from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str, findClosestGazeFrame, getCSVHeaders, getSessionName, getVideoFPS
 
 
 from collections import deque
@@ -37,8 +37,7 @@ Window.size = (1200, 800)
 Window.clearcolor = (1, 1, 1, 1)
 
 tcpserver = LogRecordSocketReceiver()
-# check if service is installed, if not install it 
-loadService()
+win_listener = WindowsGazeListener()
 
 class LoadDialog(FloatLayout):
     load = ObjectProperty(None)
@@ -262,9 +261,11 @@ class Tracker(App):
         Factory.register('LoadDialog', cls=LoadDialog)
         self.root.init_listeners()
         self.STOP_THREADS = False
-        print("starting TCP server...")
         
-        self.socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
+        if os.name == 'nt':
+            win_listener.serve_until_stopped(False)
+        else:
+            self.socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
         try:
             # Start the thread
             self.socket_thread.start()
@@ -276,7 +277,12 @@ class Tracker(App):
     def on_stop(self):
         self.STOP_THREADS = True
         self.root.stop.set()        
-        tcpserver.server_close()
+        
+        if os.name == 'nt':
+            win_listener.server_close()
+        else:
+            tcpserver.server_close()
+
         print("waiting server to close...")
         
 
