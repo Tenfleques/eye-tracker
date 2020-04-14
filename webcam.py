@@ -126,7 +126,7 @@ def trackcam(frame_rate, output = "", cam_index = 0, max_frames = 20, visualize 
 
     if output.endswith(".mp4"):
         sp = output.split(os.sep)
-        sp[-1] = "marked-" + sp[-1];
+        sp[-1] = "marked-" + sp[-1]
 
         print(os.sep.join(sp))
 
