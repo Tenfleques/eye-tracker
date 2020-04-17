@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "dgSpecHash": "d2OJsGnK4oyq24cniWi3HYGsGXOiW3KSF71wWf+g4QyZfOYhVVN25WxSK5s9xTJAATilBQXqVsVzJIAJy5Rmxw==",
+  "success": true,
+  "projectFilePath": "/Users/tendai/dev/c#/tobii_eye_tracker/samples/cs/t_eye_streams.csproj",
+  "expectedPackageFiles": [
+    "/Users/tendai/.nuget/packages/microsoft.netcore.app/2.0.0/microsoft.netcore.app.2.0.0.nupkg.sha512",
+    "/Users/tendai/.nuget/packages/microsoft.netcore.dotnetapphost/2.0.0/microsoft.netcore.dotnetapphost.2.0.0.nupkg.sha512",
+    "/Users/tendai/.nuget/packages/microsoft.netcore.dotnethostpolicy/2.0.0/microsoft.netcore.dotnethostpolicy.2.0.0.nupkg.sha512",
+    "/Users/tendai/.nuget/packages/microsoft.netcore.dotnethostresolver/2.0.0/microsoft.netcore.dotnethostresolver.2.0.0.nupkg.sha512",
+    "/usr/local/share/dotnet/sdk/NuGetFallbackFolder/microsoft.netcore.platforms/2.0.0/microsoft.netcore.platforms.2.0.0.nupkg.sha512",
+    "/Users/tendai/.nuget/packages/netstandard.library/2.0.0/netstandard.library.2.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
