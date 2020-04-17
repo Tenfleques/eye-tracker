@@ -11,7 +11,7 @@ ERROR = 1
 WARNING = 2
 INFO = 3
 LOCALE = {}
-with open("_locale.json", "r") as f:
+with open("_locale.json", "r", encoding="utf8") as f:
     LOCALE = json.load(f)
 
 LOCALE["__empty"] = {

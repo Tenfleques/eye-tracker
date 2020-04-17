@@ -177,7 +177,7 @@ class WindowsGazeListener:
     def gaze_data_handler(self, b):
         # print("Left eye: ({gaze_left_eye}) \t Right eye: ({gaze_right_eye})".format(
         #     gaze_left_eye=gaze_data['left_gaze_point_on_display_area'],
-        #     gaze_right_eye=gaze_data['right_gaze_point_on_display_area'])
+        #     gaze_right_eye=gaze_data['right_gaze_point_on_display_area']))
         l, r = EyeFrame(b, 'Left'), EyeFrame(b, 'Right')
 
         main_gaze = l["valid"] and r["valid"]
@@ -211,7 +211,9 @@ def main():
     win_listener = WindowsGazeListener()
     win_listener.serve_until_stopped(False)
     time.sleep(5)
+    print(win_listener.recent_gazes)
     win_listener.server_close()
+
 
 if __name__ == "__main__":
     main()

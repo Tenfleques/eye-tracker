@@ -266,13 +266,14 @@ class Tracker(App):
             win_listener.serve_until_stopped(False)
         else:
             self.socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
-        try:
-            # Start the thread
-            self.socket_thread.start()
-        # When ctrl+c is received
-        except KeyboardInterrupt as e:
-            tcpserver.server_close()
-            sys.exit(e)
+            try:
+                # Start the thread
+
+                self.socket_thread.start()
+            # When ctrl+c is received
+            except KeyboardInterrupt as e:
+                tcpserver.server_close()
+                sys.exit(e)
 
     def on_stop(self):
         self.STOP_THREADS = True
