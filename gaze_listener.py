@@ -7,9 +7,9 @@ import select
 import time
 from threading import Thread, current_thread
 import sys
+import socket
 
 from collections import deque
-import tobii_research as tr
 
 QUEUE_SIZE = 10 
 
@@ -38,11 +38,13 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
                 if not self.server.play:
                     break
                 chunk = chunk + self.connection.recv(slen - len(chunk))
-            obj = self.unPickle(chunk)
 
-            record = logging.makeLogRecord(obj)
+            print(chunk)
+            # obj = self.unPickle(chunk)
 
-            self.handleLogRecord(record)
+            #record = logging.makeLogRecord(obj)
+
+            #self.handleLogRecord(record)
 
 
     def unPickle(self, data):
@@ -68,6 +70,7 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
                  handler=LogRecordStreamHandler):
         
         self.handler = handler
+        print(port)
         
         socketserver.ThreadingTCPServer.__init__(self, (host, port), self.handler)
         
@@ -130,90 +133,107 @@ def talonGazeListener():
         # Exit with error code
         sys.exit(e)
 
-def EyeFrame(b, key):
-    data = b[key]
-    time_data = {
-        "device" : b["device_time_stamp"],
-        "system" : b["system_time_stamp"]
-    }
-    gaze = b[key]["gaze_point"]
-
-    record = {
-        "gaze" : {
-            "x" : gaze["position_on_display_area"][0],
-            "y" : gaze["position_on_display_area"][1]
-        },
-        "pos" : {
-            "x" : gaze["position_in_user_coordinates"][0],
-            "y" : gaze["position_in_user_coordinates"][1],
-            "z" : gaze["position_in_user_coordinates"][2]
-        },
-        "time" : time_data,
-        "valid" : gaze["validity"]
-    }
-
-    return record
-
-class WindowsGazeListener:
-    def __init__(self):
-        found_eyetrackers = tr.find_all_eyetrackers()
-        for (i, eyetracker) in enumerate(found_eyetrackers):
-            print("Address: " + eyetracker.address)
-            print("Model: " + eyetracker.model)
-            print("Name (It's OK if this is empty): " + eyetracker.device_name)
-            print("Serial number: " + eyetracker.serial_number)
-        
-        self.eyetracker = None
-        if not len(found_eyetrackers):
-            print("none supported tracker found")
-        else:
-            self.eyetracker = found_eyetrackers[0]
-        
-        self.recent_gazes = deque(QUEUE_SIZE*"", QUEUE_SIZE)
+class WindowsRecordSocketReceiver(socketserver.ThreadingTCPServer):
+    """
+        simple TCP socket-based logging receiver.
+    """
+    allow_reuse_address = 1
+    timeout = 3
+    recent_gazes = deque(QUEUE_SIZE*"", QUEUE_SIZE)
     
+    def __init__(self,host = 'localhost',    # The remote host
+                      port = 11000):   
+        self.s = None
+        self.update_thread = None
+        self.stop = lambda : False
+
+        for res in socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            try:
+                self.s = socket.socket(af, socktype, proto)
+            except OSError as msg:
+                self.s = None
+                continue
+            try:
+                self.s.connect(sa)
+            except OSError as msg:
+                self.s.close()
+                self.s = None
+                continue
+            break
+     
     def getTopRecords(self):
         return self.recent_gazes
 
-    def gaze_data_handler(self, b):
-        # print("Left eye: ({gaze_left_eye}) \t Right eye: ({gaze_right_eye})".format(
-        #     gaze_left_eye=gaze_data['left_gaze_point_on_display_area'],
-        #     gaze_right_eye=gaze_data['right_gaze_point_on_display_area']))
-        l, r = EyeFrame(b, 'Left'), EyeFrame(b, 'Right')
-
-        main_gaze = l["valid"] and r["valid"]
-
-        message = '''{},
-                    {},{},
-                    {},{},
-                    {},{},{},
-                    {},{},{},
-                    {}'''.format(
-                            time.time(),
-                            l["gaze"]["x"], l["gaze"]["y"], 
-                            r["gaze"]["x"], r["gaze"]["y"],
-                            l["pos"]["x"], l["pos"]["y"], l["pos"]["z"],
-                            r["pos"]["x"], r["pos"]["y"], r["pos"]["z"],
-                            int(main_gaze),
-                            )
-        message = "".join(message.split())
-
-        self.recent_gazes.appendleft(message)
-
     def server_close(self):
-        if self.eyetracker:
-            self.eyetracker.unsubscribe_from(tr.EYETRACKER_GAZE_DATA, self.gaze_data_handler)
+        if self.update_thread:
+            self.update_thread._stop()
+        self.s.close()
+        self.s = None
+
+    def continuousUpdate(self, stop):
+        while (not stop()) and self.s:
+            data = self.s.recv(1024)
+            print(data, " received")
+            record = repr(data)
+            self.recent_gazes.append(record)
+            self.play = not stop()
 
     def serve_until_stopped(self, stop):
-        if self.eyetracker:
-            self.eyetracker.subscribe_to(tr.EYETRACKER_GAZE_DATA,  self.gaze_data_handler, as_dictionary=True)
+         if self.s is None:
+            print('could not open socket')
+            return
+         self.stop = stop
 
+         with self.s:
+            self.s.sendall(b'stream')
+            self.update_thread = Thread(self.continuousUpdate)
+            self.update_thread.start()
+
+
+def winEyeGazeListener():
+    tcpserver = WindowsRecordSocketReceiver()
+    print("About to start TCP server...")
+    socket_thread_alive = True
+    socket_thread = Thread(target=tcpserver.serve_until_stopped, args=(lambda : not socket_thread_alive, ))
+    try:
+        # Start the thread
+        socket_thread.start()
+        for i in range(4):
+            RECENT_GAZES = tcpserver.getTopRecords()
+            if len(RECENT_GAZES):
+                print(RECENT_GAZES[0])
+
+            print("sleeping {}".format(i))
+            
+            time.sleep(1.5)
+
+        socket_thread_alive = False
+        tcpserver.server_close()
+        print("waiting to close")
+        sys.exit(0)
+        print("should be closed now")
+    # When ctrl+c is received
+    except KeyboardInterrupt as e:
+        # Set the alive attribute to false
+        socket_thread_alive = False
+        # Exit with error code
+        sys.exit(e)
+
+
+tcpserver = LogRecordSocketReceiver(port =11000)
 def main():
-    win_listener = WindowsGazeListener()
-    win_listener.serve_until_stopped(False)
-    time.sleep(5)
-    print(win_listener.recent_gazes)
-    win_listener.server_close()
-
+    socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : False, ))
+    try:
+        # Start the thread
+        print("should be threading here")
+        socket_thread.start()
+        print("thread started...")
+    # When ctrl+c is received
+    except KeyboardInterrupt as e:
+        tcpserver.server_close()
+        sys.exit(e)
 
 if __name__ == "__main__":
+    # winEyeGazeListener()
     main()

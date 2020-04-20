@@ -1,0 +1,17 @@
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\bin\Debug\interaction_lib_c.dll
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\bin\Debug\interaction_lib.dll
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\bin\Debug\tobii_stream_engine.dll
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\bin\Debug\cs_sample.deps.json
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\bin\Debug\cs_sample.runtimeconfig.json
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\bin\Debug\cs_sample.runtimeconfig.dev.json
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\bin\Debug\cs_sample.dll
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\bin\Debug\cs_sample.pdb
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\bin\Debug\interaction_lib_cs.dll
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\obj\Debug\cs_sample.csprojAssemblyReference.cache
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\obj\Debug\cs_sample.csproj.CoreCompileInputs.cache
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\obj\Debug\cs_sample.AssemblyInfoInputs.cache
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\obj\Debug\cs_sample.AssemblyInfo.cs
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\obj\Debug\cs_sample.csproj.CopyComplete
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\obj\Debug\cs_sample.dll
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\obj\Debug\cs_sample.pdb
+C:\Users\tendai\source\repos\tobii_interaction_lib_windows_x64\samples\cs\obj\Debug\cs_sample.genruntimeconfig.cache

@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "tobii_stream": {
+      "commandName": "Project"
+    }
+  }
+}
