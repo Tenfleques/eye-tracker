@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v2.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v2.0": {
+      "cs_sample/1.0.0": {
+        "dependencies": {
+          "interaction_lib_cs": "0.7.340.0"
+        },
+        "runtime": {
+          "cs_sample.dll": {}
+        }
+      },
+      "interaction_lib_cs/0.7.340.0": {
+        "runtime": {
+          "interaction_lib_cs.dll": {
+            "assemblyVersion": "0.7.340.0",
+            "fileVersion": "0.7.340.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "cs_sample/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "interaction_lib_cs/0.7.340.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

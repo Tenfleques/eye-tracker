@@ -24,7 +24,7 @@ import sys
 
 import cv2
 
-from gaze_listener import LogRecordSocketReceiver, WindowsGazeListener
+from gaze_listener import WindowsRecordSocketReceiver, LogRecordSocketReceiver
 from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str, findClosestGazeFrame, getCSVHeaders, getSessionName, getVideoFPS
 
 
@@ -36,8 +36,8 @@ from kivy.core.window import Window
 Window.size = (1200, 800)
 Window.clearcolor = (1, 1, 1, 1)
 
-tcpserver = LogRecordSocketReceiver()
-win_listener = WindowsGazeListener()
+# tcpserver = WindowsRecordSocketReceiver(port = 11000)
+tcpserver = LogRecordSocketReceiver(port =11000)
 
 class LoadDialog(FloatLayout):
     load = ObjectProperty(None)
@@ -264,27 +264,22 @@ class Tracker(App):
         self.root.init_listeners()
         self.STOP_THREADS = False
         
-        if os.name == 'nt':
-            win_listener.serve_until_stopped(False)
-        else:
-            self.socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
-            try:
-                # Start the thread
-
-                self.socket_thread.start()
-            # When ctrl+c is received
-            except KeyboardInterrupt as e:
-                tcpserver.server_close()
-                sys.exit(e)
+       
+        self.socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
+        try:
+            # Start the thread
+            print("should be threading here")
+            self.socket_thread.start()
+        # When ctrl+c is received
+        except KeyboardInterrupt as e:
+            tcpserver.server_close()
+            sys.exit(e)
 
     def on_stop(self):
         self.STOP_THREADS = True
-        self.root.stop.set()        
+        self.root.stop.set()
         
-        if os.name == 'nt':
-            win_listener.server_close()
-        else:
-            tcpserver.server_close()
+        tcpserver.server_close()
 
         print("waiting server to close...")
         
@@ -292,3 +287,4 @@ class Tracker(App):
 if __name__ == '__main__':
     tracker = Tracker()
     tracker.run()
+
