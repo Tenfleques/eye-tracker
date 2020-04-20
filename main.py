@@ -144,10 +144,12 @@ class Root(FloatLayout):
         self.ids["btn_capture"].text = self.get_local_str("_start")
         self.frame_id = 0
 
-        if self.ids['lbl_src_video'].text:
-            self.capture = cv2.VideoCapture(self.ids['lbl_src_video'].text)
-            if self.capture.isOpened():
-                self.video_update(None)
+        v_path = self.ids['lbl_src_video'].text
+        if v_path:
+            if os.path.exists(v_path):
+                self.capture = cv2.VideoCapture(v_path)
+                if self.capture.isOpened():
+                    self.video_update(None)
             
     def playVideo(self):
         if "capture" in props(self):
