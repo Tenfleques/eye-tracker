@@ -24,7 +24,7 @@ import sys
 
 import cv2
 
-from gaze_listener import LogRecordSocketReceiver, WindowsGazeListener
+from gaze_listener import LogRecordSocketReceiver
 from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str, findClosestGazeFrame, getCSVHeaders, getSessionName, getVideoFPS
 
 
@@ -37,7 +37,6 @@ Window.size = (1200, 800)
 Window.clearcolor = (1, 1, 1, 1)
 
 tcpserver = LogRecordSocketReceiver()
-win_listener = WindowsGazeListener()
 
 class LoadDialog(FloatLayout):
     load = ObjectProperty(None)
@@ -49,12 +48,10 @@ class Root(FloatLayout):
     stop = threading.Event()
     
     def init_listeners(self):
-        self.session_frames = deque()
         self.ready_device= False
         self.session_name = None
         self.initVideo()
         self.check_tracker = Clock.schedule_interval(self.updateNano,1/2)
-
 
     def updateNano(self, r):
         if self.eyetracker_ready():
@@ -64,7 +61,7 @@ class Root(FloatLayout):
         lbl_output_dir = self.ids['lbl_output_dir']
         self.save_path = self.ids['lbl_output_dir'].text
 
-        ready = os.path.isdir(self.save_path)       
+        ready = os.path.isdir(self.save_path)
         if not ready:
             lbl_output_dir.color = (1,0,0,1)
             self.applog(self.get_local_str("_directory_not_selected"))
@@ -106,7 +103,6 @@ class Root(FloatLayout):
 
     def initSession(self):
         self.session_name = getSessionName()
-        self.session_frames = deque()
         session_label = self.ids["session_label"]
         session_label.text = get_local_str("_session") + ": " + self.session_name
 
@@ -145,7 +141,8 @@ class Root(FloatLayout):
         self.frame_id = 0
 
         if self.ids['lbl_src_video'].text:
-            self.capture = cv2.VideoCapture(self.ids['lbl_src_video'].text)
+            vid_path = self.ids['lbl_src_video'].text
+            self.capture = cv2.VideoCapture(vid_path)
             if self.capture.isOpened():
                 self.video_update(None)
             
@@ -208,6 +205,7 @@ class Root(FloatLayout):
         # # save the respective data, signal data, gaze data, frame data in thread with save_capture_cb as callback
 
         result = findClosestGazeFrame(recent_gazes, frame_id, tm)
+
         frame.save(self.getImageFilename(frame_id))
 
         self.ids['gaze_log'].text = result["log"] + self.ids['gaze_log'].text
@@ -262,10 +260,7 @@ class Tracker(App):
         self.root.init_listeners()
         self.STOP_THREADS = False
         
-        if os.name == 'nt':
-            win_listener.serve_until_stopped(False)
-        else:
-            self.socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
+        self.socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
         try:
             # Start the thread
             self.socket_thread.start()
@@ -278,10 +273,7 @@ class Tracker(App):
         self.STOP_THREADS = True
         self.root.stop.set()        
         
-        if os.name == 'nt':
-            win_listener.server_close()
-        else:
-            tcpserver.server_close()
+        tcpserver.server_close()
 
         print("waiting server to close...")
         

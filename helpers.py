@@ -48,18 +48,22 @@ def get_local_str(key):
 
         return key
 
-def previewQueues(gazes, ctrl_timestamp):
+def previewQueues(gazes, ctrl_timestamp, prev_frames = []):
   import pandas as pd
+  l = len(gazes)
+  lf = len(prev_frames)
+  gazes = [str(x.split(",")[0]) for x in gazes] + [0 for i in range(lf)]
   df_series = {
-    "gazes":  [str(x.split(",")[0]) for x in gazes],
-    "capture time" : [str(ctrl_timestamp) for i in gazes]
+    "gazes":  gazes[:lf],
+    "capture time" : [str(ctrl_timestamp) for i in range(lf)],
+    "prev_frames" : [str(prev_frames[i]["time"]) for i in range(lf)]
   }
   df = pd.DataFrame(df_series)
-  print(df.tail(30))
+  df.to_csv("local.csv")
 
-def findClosestGazeFrame(gazes, frame_id, tm):
+def findClosestGazeFrame(gazes, frame_id, tm, frames = []):
   gaze = gazes[0].split(",")
-  # previewQueues(gazes, tm)  
+  # previewQueues(gazes, tm, frames)
   
   diff = 0.0
   if gaze[0]:
