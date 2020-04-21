@@ -2,7 +2,7 @@ import os
 import sys
 from ctypes import cdll, c_double, c_bool, c_int, Structure, POINTER
 from numpy.ctypeslib import ndpointer
-from helpers import props
+from eye_utilities.helpers import props
 import time
 import numpy as np
 
@@ -15,7 +15,7 @@ class Record(Structure):
             ('valid', c_bool)
         ]
 
-path = "C:\\Users\\tendai\\source\\repos\\TobiiEyeLib\\x64\\Debug\\TobiiEyeLib.dll"
+path = "TobiiEyeLib\\x64\\Debug\\TobiiEyeLib.dll"
 lib = cdll.LoadLibrary(path)
 
 lib.stop.restype = c_int

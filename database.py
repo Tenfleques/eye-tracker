@@ -1,1 +1,0 @@
-# used to dump the results of a session to the database

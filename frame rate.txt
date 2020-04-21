@@ -1,4 +1,0 @@
-Factors That Affect Frame Rate
- the fixed resolution,
- the webcam software, 
- the amount of light in the room, 

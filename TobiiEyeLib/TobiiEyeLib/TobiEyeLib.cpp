@@ -12,9 +12,6 @@
 const int size = 4;
 std::thread update_thread;
 
-//double def[size] = {.0, .0, .0, .0};
-
-std::deque<const char*> latestRecords = std::deque<const char*>(10);
 
 bool updating = false;
 IL::UniqueInteractionLibPtr intlib(IL::CreateInteractionLib(IL::FieldOfUse::Interactive));
@@ -25,15 +22,32 @@ constexpr float height = 1440.0f;
 constexpr float offset = 0.0f;
 
 
+struct Record {
+    Record() {
+        this->x = 0.0;
+        this->y = 0.0;
+    }
+    Record(IL::GazePointData evt) {
+        this->x = evt.x;
+        this->y = evt.y;
+        this->timestamp = double(evt.timestamp_us);
+        this->engineTimestamp = double(evt.timestamp_us);
+        this->valid = evt.validity == IL::Validity::Valid;
+    };
+
+    double x, y, timestamp, engineTimestamp;
+    bool valid = false;
+};
+std::deque<Record> latestRecords = std::deque<Record>(10);
 
 int stop() {
+    
     if (updating) {
         updating = false;
         update_thread.join();
-        //update_thread.detach();
         return 1;
     }    
-	return 0;
+    return 0;
 }
 
 void updateRecords() {
@@ -41,7 +55,7 @@ void updateRecords() {
     intlib->CoordinateTransformSetOriginOffset(offset, offset);
     intlib->SubscribeGazePointData([](IL::GazePointData evt, void* context) {
         double res[size] = { evt.x, evt.y, double(evt.validity == IL::Validity::Valid), double(evt.timestamp_us) };
-        //latestRecords.push_front(res);
+        //
         std::stringstream ss;
         ss << evt.x << ","
             << evt.y << ","
@@ -53,10 +67,7 @@ void updateRecords() {
         //std::cout
         //    << s
         //    << "\n";
-
-        const char* c_s = s.c_str();
-
-
+        latestRecords.push_front(Record(evt));
     }, nullptr);
 
     while (updating) {
@@ -66,8 +77,7 @@ void updateRecords() {
 
 int start() {
     for (int i = 0; i < 10; ++i) {
-        const char* init_res = std::string("0,0,0,0").c_str();
-        latestRecords.push_front(init_res);
+        latestRecords.push_front(Record());
     }
     if (!updating) {
         updating = true;
@@ -76,13 +86,10 @@ int start() {
     return update_thread.joinable();
 }
 
-double** getLatest() {
-    double** r = new double*[10];
+Record* getLatest() {
+    Record* r = new Record[10];
     for (int i = 0; i < 10; ++i) {
-        r[i] = new double[size];
-        for (int j = 0; j < size; ++j) {
-            r[i][j] = latestRecords[i][j];
-        }
+        r[i] = latestRecords[i];
     }
     return r;
 }
