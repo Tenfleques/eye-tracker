@@ -1,7 +1,4 @@
-import os
-import sys
 from ctypes import cdll, c_double, c_bool, c_int, Structure, POINTER
-from numpy.ctypeslib import ndpointer
 from eye_utilities.helpers import props
 import time
 import numpy as np

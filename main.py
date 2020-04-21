@@ -24,20 +24,17 @@ import sys
 
 import cv2
 
-from gaze_listener import WindowsRecordSocketReceiver, LogRecordSocketReceiver
-from helpers import props, createlog, ERROR, WARNING, INFO, get_local_str, findClosestGazeFrame, getCSVHeaders, getSessionName, getVideoFPS
+from gaze_listener import TobiiWinGazeWatcher
+from eye_utilities.helpers import props, createlog, ERROR, WARNING, INFO, get_local_str, findClosestGazeFrame, getCSVHeaders, getSessionName, getVideoFPS, props
 
 
 from collections import deque
-
-from helpers import props
 from kivy.core.window import Window
 
 Window.size = (1200, 800)
 Window.clearcolor = (1, 1, 1, 1)
 
-# tcpserver = WindowsRecordSocketReceiver(port = 11000)
-tcpserver = LogRecordSocketReceiver(port =11000)
+tobii_listener = TobiiWinGazeWatcher()
 
 class LoadDialog(FloatLayout):
     load = ObjectProperty(None)
@@ -74,7 +71,7 @@ class Root(FloatLayout):
         return ready
 
     def eyetracker_ready(self):
-        recent_gazes = tcpserver.getTopRecords()
+        recent_gazes = tobii_listener.getTopRecords()
         
         self.ready_device= len(recent_gazes) and recent_gazes[0]
         error_log = self.get_local_str("_gaze_device_not_ready")
@@ -204,7 +201,7 @@ class Root(FloatLayout):
         # get the top gaze data, find the record whose time closest or equal to call time.
         tm = time.time()
         frame = self.ids["camera"].export_as_image()
-        recent_gazes = copy.copy(tcpserver.getTopRecords())
+        recent_gazes = copy.copy(tobii_listener.getTopRecords())
         
         # get top frames, find the frame whose time closest or equal to call time. 
         # # save the respective data, signal data, gaze data, frame data in thread with save_capture_cb as callback
@@ -265,21 +262,20 @@ class Tracker(App):
         self.STOP_THREADS = False
         
        
-        self.socket_thread = Thread(target=tcpserver.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
+        self.socket_thread = Thread(target=tobii_listener.serve_until_stopped,  args =(lambda : self.STOP_THREADS, ))
         try:
             # Start the thread
-            print("should be threading here")
             self.socket_thread.start()
         # When ctrl+c is received
         except KeyboardInterrupt as e:
-            tcpserver.server_close()
+            tobii_listener.server_close()
             sys.exit(e)
 
     def on_stop(self):
         self.STOP_THREADS = True
         self.root.stop.set()
         
-        tcpserver.server_close()
+        tobii_listener.server_close()
 
         print("waiting server to close...")
         
