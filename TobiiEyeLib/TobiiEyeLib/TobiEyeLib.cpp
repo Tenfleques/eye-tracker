@@ -5,7 +5,6 @@
 #include <assert.h>
 #include <string.h>
 #include <limits.h>
-#include <deque>
 #include <thread>
 #include <chrono>
 #include "TobiEyeLib.h"
@@ -137,8 +136,6 @@ struct Record {
 
 // the temporary record to update in the callbacks 
 Record tmp_record;
-std::deque<Record> latestRecords = std::deque<Record>(10);
-// the queue with the top 10 recent records 
 
 
 void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_data */) {
@@ -219,9 +216,6 @@ int start() {
         printf("%s\n", tobii_error_message(result));
     assert(result == TOBII_ERROR_NO_ERROR);
 
-    for (int i = 0; i < 10; ++i) {
-        latestRecords.push_front(Record());
-    }
     if (!updating) {
         updating = true;
         update_thread = std::thread(updateRecords);
