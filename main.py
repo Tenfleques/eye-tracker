@@ -266,6 +266,7 @@ class Tracker(App):
         try:
             # Start the thread
             self.socket_thread.start()
+            print("started thread")
         # When ctrl+c is received
         except KeyboardInterrupt as e:
             tobii_listener.server_close()

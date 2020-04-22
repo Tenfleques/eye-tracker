@@ -58,35 +58,33 @@ def previewQueues(gazes, ctrl_timestamp):
   print(df.tail(30))
 
 def findClosestGazeFrame(gazes, frame_id, tm):
-  gaze = gazes[0].split(",")
+  gaze = gazes[0]
   # previewQueues(gazes, tm)  
   
   diff = 0.0
   if gaze[0]:
-    diff = math.fabs(tm - float(gaze[0]))
+    diff = math.fabs(tm - gaze.sys_clock)
   
     for i in range(1,len(gazes)):
       if gazes[i][0]:
-        arr = gazes[i].split(",")
-        pt_diff = math.fabs(tm - float(arr[0]))
+        arr = gazes[i]
+        pt_diff = math.fabs(tm - arr[0].sys_clock)
 
         if pt_diff < diff:
           diff = pt_diff
           gaze = arr
 
-  str_gaze = [str(frame_id)] + gaze
-
   for i in range(1,12):
     gaze[i]=float(gaze[i])
 
   result = {
-    "log" : "frame {}: \t ({:.2},{:.2}), \t ({:.2}, {:.2}), \t acc: {:.4}\n\n".format(str_gaze[0], gaze[1], gaze[2], gaze[3], gaze[4], diff),
-    "gaze" : ",".join(str_gaze)
+    "log" : "frame {}: \t ({:.4},{:.4}), \t acc: {:.4}\n\n".format(frame_id, gaze.x, gaze.y, diff),
+    "gaze" : gaze.csvString(frame_id, tm, diff)
   }
   return result
 
 def getCSVHeaders():
-      return '"frame","timestamp","gaze_left_x","gaze_left_y","gaze_right_x","gaze_right_y","pos_left_x","pos_left_y","pos_left_z","pos_right_x","pos_right_y","pos_right_z","is_main_gaze","video" \n'
+      return '"frame","timestamp","gaze_x","gaze_y","valid_gaze","origin_left_x","origin_left_y","origin_left_z","origin_right_x","origin_right_y","origin_right_z", "valid_origin","pos_left_x","pos_left_y","pos_left_z","pos_right_x","pos_right_y","pos_right_z","valid_pos","video" \n'
 
 def createlog(text, logtype = INFO):
   str_logtype = {

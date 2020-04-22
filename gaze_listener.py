@@ -8,7 +8,9 @@ import time
 from threading import Thread, current_thread
 import sys
 import socket
-from ctypes import cdll, c_double, c_bool, c_int, Structure, POINTER
+from tracker_record import Record
+
+from ctypes import cdll, c_int, POINTER
 
 from collections import deque
 
@@ -18,25 +20,7 @@ def props(cls):
   return [i for i in cls.__dict__.keys() if i[:1] != '_']
 
 tobii_dll_path = "TobiiEyeLib\\x64\\Debug\\TobiiEyeLib.dll"
-
-class WinInteractiveRecord(Structure):
-    _fields_ = [('x', c_double),
-            ('y', c_double),
-            ('timestamp', c_double),
-            ('engineTimestamp', c_double),
-            ('valid', c_bool),
-            # ('lgaze_x', c_double), 
-            # ('lgaze_y', c_double),
-            # ('rgaze_x', c_double), 
-            # ('rgaze_y', c_double),
-            # ('lpos_x', c_double), 
-            # ('lpos_y', c_double),
-            # ('lpos_z', c_double),
-            # ('rpos_x', c_double),
-            # ('rpos_y', c_double),
-            # ('rpos_z', c_double)
-        ]
-
+tobiiEyeLib = cdll.LoadLibrary(tobii_dll_path)
 class TobiiWinGazeWatcher():
     """
         simple API to the gaze watcher on windows platforms
@@ -44,14 +28,12 @@ class TobiiWinGazeWatcher():
     recent_gazes = deque(QUEUE_SIZE*"", QUEUE_SIZE)
     
     def __init__(self):
-        self.tobiiEyeLib = cdll.LoadLibrary(tobii_dll_path)
-
+        self.tobiiEyeLib = tobiiEyeLib
         self.tobiiEyeLib.stop.restype = c_int
         self.tobiiEyeLib.start.restype = c_int
-        started = self.tobiiEyeLib.start()
-        print("listener started", started)
-        # getLatest returns latest 10 records of the gaze data 
-        self.tobiiEyeLib.getLatest.restype = POINTER(WinInteractiveRecord)
+        self.tobiiEyeLib.getLatest.restype = POINTER(Record)
+        self.tobiiEyeLib.start()
+        
 
     def getTopRecords(self):
         return self.recent_gazes
@@ -63,28 +45,14 @@ class TobiiWinGazeWatcher():
 
     def serve_until_stopped(self, stop):
         while not stop():
-            output = self.tobiiEyeLib.getLatest()
-            # print(output[0].x, output[0].y)
-
-            for i in range(QUEUE_SIZE):
-                message = '''{},
-                        {},{},
-                        {},{},
-                        {},{},{},
-                        {},{},{},
-                        {}'''.format(
-                                output[i].timestamp,
-                                output[i].x, output[i].y,
-                                .0, .0,
-                                .0, .0, .0,
-                                .0, .0, .0,
-                                # output[i].lgaze_x, output[i].lgaze_y, 
-                                # output[i].rgaze_x, output[i].rgaze_y, 
-                                # output[i].lpos_x, output[i].lpos_y, output[i].lpos_z, 
-                                # output[i].rpos_x, output[i].rpos_y, output[i].rpos_z,
-                                int(output[i].valid))
-
-                self.recent_gazes.appendleft(message)
+            try :
+                output = self.tobiiEyeLib.getLatest()
+                if output:
+                    for i in range(QUEUE_SIZE):
+                        self.recent_gazes.appendleft(output[i])
+            except OSError as msg:
+                print(msg)
+                continue
             self.play = not stop()
 
 
@@ -109,6 +77,7 @@ class WindowsRecordSocketReceiver(socketserver.ThreadingTCPServer):
                 self.s = socket.socket(af, socktype, proto)
             except OSError as msg:
                 self.s = None
+                print(msg)
                 continue
             try:
                 self.s.connect(sa)
@@ -148,21 +117,21 @@ class WindowsRecordSocketReceiver(socketserver.ThreadingTCPServer):
 
 
 def winEyeGazeListener():
-    tcpserver = WindowsRecordSocketReceiver()
+    tcpserver = TobiiWinGazeWatcher()
     print("About to start TCP server...")
     socket_thread_alive = True
     socket_thread = Thread(target=tcpserver.serve_until_stopped, args=(lambda : not socket_thread_alive, ))
     try:
         # Start the thread
         socket_thread.start()
-        for i in range(4):
+        for i in range(120):
             RECENT_GAZES = tcpserver.getTopRecords()
             if len(RECENT_GAZES):
-                print(RECENT_GAZES[0])
+                print(RECENT_GAZES[0].toString())
 
             print("sleeping {}".format(i))
             
-            time.sleep(1.5)
+            time.sleep(1)
 
         socket_thread_alive = False
         tcpserver.server_close()
@@ -175,3 +144,6 @@ def winEyeGazeListener():
         socket_thread_alive = False
         # Exit with error code
         sys.exit(e)
+
+if __name__ == '__main__':
+    winEyeGazeListener()
