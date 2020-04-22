@@ -47,9 +47,8 @@ class TobiiWinGazeWatcher():
         while not stop():
             try :
                 output = self.tobiiEyeLib.getLatest()
-                if output:
-                    for i in range(QUEUE_SIZE):
-                        self.recent_gazes.appendleft(output[i])
+                self.recent_gazes.appendleft(output.contents)
+                del output
             except OSError as msg:
                 print(msg)
                 continue

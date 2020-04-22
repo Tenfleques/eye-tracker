@@ -180,7 +180,7 @@ void updateRecords() {
         result = tobii_device_process_callbacks(device);
         assert(result == TOBII_ERROR_NO_ERROR);
 
-        latestRecords.push_front(Record(tmp_record));
+        //latestRecords.push_front(Record(tmp_record));
     }
 }
 
@@ -260,9 +260,5 @@ int stop() {
 
 
 Record* getLatest() {
-    Record* r = new Record[10];
-    for (int i = 0; i < 10; ++i) {
-        r[i] = latestRecords[i];
-    }
-    return r;
+    return &tmp_record;
 }
