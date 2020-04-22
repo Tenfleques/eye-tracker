@@ -9,6 +9,7 @@ from threading import Thread, current_thread
 import sys
 import socket
 from tracker_record import Record
+import copy
 
 from ctypes import cdll, c_int, POINTER
 
@@ -20,15 +21,15 @@ def props(cls):
   return [i for i in cls.__dict__.keys() if i[:1] != '_']
 
 tobii_dll_path = "TobiiEyeLib\\x64\\Debug\\TobiiEyeLib.dll"
-tobiiEyeLib = cdll.LoadLibrary(tobii_dll_path)
+
 class TobiiWinGazeWatcher():
     """
         simple API to the gaze watcher on windows platforms
     """
-    recent_gazes = deque(QUEUE_SIZE*"", QUEUE_SIZE)
+    recent_gazes = deque(maxlen=QUEUE_SIZE)
     
     def __init__(self):
-        self.tobiiEyeLib = tobiiEyeLib
+        self.tobiiEyeLib = cdll.LoadLibrary(tobii_dll_path)
         self.tobiiEyeLib.stop.restype = c_int
         self.tobiiEyeLib.start.restype = c_int
         self.tobiiEyeLib.getLatest.restype = POINTER(Record)
@@ -47,7 +48,7 @@ class TobiiWinGazeWatcher():
         while not stop():
             try :
                 output = self.tobiiEyeLib.getLatest()
-                self.recent_gazes.appendleft(output.contents)
+                self.recent_gazes.appendleft(output[0])
                 del output
             except OSError as msg:
                 print(msg)

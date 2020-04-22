@@ -1,6 +1,7 @@
 from ctypes import cdll, c_float, c_bool, c_double, c_int, c_int64, Structure, POINTER
 from eye_utilities.helpers import props
 import time
+import json
 
 class Point2D(Structure): 
     _fields_ = [('x', c_float), ('y', c_float)]
@@ -33,7 +34,45 @@ class Record(Structure):
         ('gaze_timestamp_us', c_int64), ('origin_timestamp_us', c_int64), 
         ('pos_timestamp_us', c_int64), ('sys_clock', c_double),
         ('gaze_valid', c_bool), ('pos_valid', c_bool), ('origin_valid', c_bool)]
-    
+
+    def toDict(self):
+        return {
+            "gaze" : {
+                "x" : self.gaze.x,
+                "y" : self.gaze.y,
+                "timestamp" : self.gaze_timestamp_us,
+                "valid" : self.gaze_valid
+            },
+            "pos" : {
+                "left" : {
+                    "x" : self.pos.left.x,
+                    "y" : self.pos.left.y,
+                    "z" : self.pos.left.z
+                },
+                "right" : {
+                    "x" : self.pos.right.x,
+                    "y" : self.pos.right.y,
+                    "z" : self.pos.right.z   
+                },
+                "timestamp" : self.pos_timestamp_us,
+                "valid" : self.pos_valid
+            },
+            "origin" : {
+                "left" : {
+                    "x" : self.origin.left.x,
+                    "y" : self.origin.left.y,
+                    "z" : self.origin.left.z
+                },
+                "right" : {
+                    "x" : self.origin.right.x,
+                    "y" : self.origin.right.y,
+                    "z" : self.origin.right.z   
+                },
+                "timestamp" : self.origin_timestamp_us,
+                "valid" : self.origin_valid
+            },
+            "timestamp" : self.sys_clock
+        }
     def toString(self):
         message = '''gaze: \t   {}, {}, {}, {},\n origin: \t {}, {}, {}, {}, {},{}, {}, {},\n pos: \t    {}, {}, {}, {}, {}, {}, {}, {} \n clock {}, pyclock {}
                     '''.format(self.gaze.x, self.gaze.y, self.gaze_timestamp_us, self.gaze_valid,
@@ -50,7 +89,7 @@ class Record(Structure):
         return message
     
     def csvString(self, frame_id, tm, diff):
-        message = '''{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}'''.format(frame_id, tm, 
+        message = '''{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}'''.format(frame_id, tm, 
         self.gaze.x, self.gaze.y, self.gaze_valid,
                     
         self.origin.left.x, self.origin.left.y, self.origin.left.z, 
