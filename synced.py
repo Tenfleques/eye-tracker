@@ -11,6 +11,15 @@ from collections import deque
 import numpy as np
 
 
+class DummyTobii:
+    def start(self):
+        pass
+    def stop(self):
+        pass
+    def getLatest(self):
+        r = Record()
+        r.sys_clock = -1
+        return [r]
 
 class Synced:    
     cam_feed = None # cam feed thread
@@ -32,7 +41,7 @@ class Synced:
     def __init__(self, 
                 video_path,
                 save_dir = "sample", 
-                dll_path = "TobiiEyeLib\\x64\\Debug\\TobiiEyeLib.dll", 
+                dll_path = "TobiiEyeLib/x64/Debug/TobiiEyeLib.dll", 
                 cam_index = 0, 
                 poll_wait = 10):
         
@@ -40,15 +49,19 @@ class Synced:
         self.SCREEN_SIZE = screen_grab.size
 
         self.poll_wait = poll_wait
-        self.tobii_lib = cdll.LoadLibrary(dll_path)
+        try:
+            self.tobii_lib = cdll.LoadLibrary(dll_path)
+            self.tobii_lib.stop.restype = c_int
+            self.tobii_lib.start.restype = c_int
+            self.tobii_lib.getLatest.restype = POINTER(Record)
+        except OSError:
+            self.tobii_lib = DummyTobii()
+            
+
         self.save_dir = save_dir
         self.img_dir = save_dir
         self.cam_index = cam_index
         self.video_path = video_path
-
-        self.tobii_lib.stop.restype = c_int
-        self.tobii_lib.start.restype = c_int
-        self.tobii_lib.getLatest.restype = POINTER(Record)
 
         self.video_name = "video"
 
