@@ -1,0 +1,27 @@
+#:kivy 1.1.0
+# <BackgroundColor@Widget>
+#     background_color: 1, 1, 1, 1
+#     canvas.before:
+#         Color:
+#             rgba: root.background_color
+#         Rectangle:
+#             size: self.size
+#             pos: self.pos
+            
+# <BackgroundBoxLayout@BoxLayout+BackgroundColor>
+#     background_color: 1, 1, 1, 1
+
+# <BackgroundLabel@Label+BackgroundColor>
+#     background_color: 1, 1, 1, 1
+
+Root:
+    BoxLayout:
+        orientation: 'vertical'
+        BoxLayout:
+            orientation: 'horizontal'
+            id: main
+                size_hint_x: .65 
+                padding: [5, 5, 5, 5]
+        # InfoBar:
+        #     size_hint: [None, None]
+        #     background_color: (0, .196, .313, 1)

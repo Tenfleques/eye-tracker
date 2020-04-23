@@ -79,8 +79,6 @@ class Synced:
         else:
             # set the video determined fps
             self.vid_fps = self.vid_cap.get(cv2.CAP_PROP_FPS)
-        
-        print("supplied fps: {}, used fps: {}".format(video_fps, self.vid_fps))
 
         if cam_fps:
             self.cam_fps = cam_fps
@@ -249,6 +247,7 @@ class Synced:
 
     def all_ready(self):
         gaze = self.tobii_lib.getLatest()[0]
+        print(gaze)
         if not self.cam_cap.isOpened():
             return False
 
