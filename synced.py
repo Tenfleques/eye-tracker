@@ -247,7 +247,6 @@ class Synced:
 
     def all_ready(self):
         gaze = self.tobii_lib.getLatest()[0]
-        print(gaze)
         if not self.cam_cap.isOpened():
             return False
 
