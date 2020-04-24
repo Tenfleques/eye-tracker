@@ -7,7 +7,7 @@
 #include <thread>
 #include <chrono>
 #include "TobiEyeLib.h"
-#include <windows.h
+#include <windows.h>
 #include "opencv2/opencv.hpp"
 
 double timeInMilliseconds() {
@@ -123,7 +123,7 @@ struct Record {
         frame = f;
         selfie_time = timeInMilliseconds()
         cv::Size s = f.size();
-        img_shape = Point3D(f.height, f.width, 3)
+        img_shape = Point3D(f.height, f.width, 3);
     }
     void print() {
         gaze.print();
@@ -161,7 +161,7 @@ void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_dat
     tmp_record.setGaze(gaze_point);
     cap >> tmp_record.frame;
     cv::Size s = tmp_record.frame.size();
-    tmp_record.img_shape = Point3D(f.height, f.width, 3)
+    tmp_record.img_shape = Point3D(f.height, f.width, 3);
 }
 void gaze_origin_callback(tobii_gaze_origin_t const* gaze_origin, void* user_data) {
     tmp_record.setOrigin(gaze_origin);
@@ -204,14 +204,14 @@ int start(int cam_index = 0) {
         printf("Error: Camera error \n");
         return 0;
     }
-    if assert_tobii_error(result)
+    if (assert_tobii_error(result))
         return 0;
 
     // Enumerate devices to find connected eye trackers, keep the first
     char url[256] = { 0 };
     result = tobii_enumerate_local_device_urls(api, url_receiver, url);
 
-    if assert_tobii_error(result)
+    if (assert_tobii_error(result))
           return 0;
 
     if (*url == '\0'){
@@ -221,7 +221,7 @@ int start(int cam_index = 0) {
 
     result = tobii_device_create(api, url, TOBII_FIELD_OF_USE_INTERACTIVE, &device);
 
-    if assert_tobii_error(result)
+    if (assert_tobii_error(result))
           return 0;
 
     // Subscribe to gaze data
@@ -229,7 +229,7 @@ int start(int cam_index = 0) {
     result = tobii_gaze_origin_subscribe(device, gaze_origin_callback, 0);
     result = tobii_eye_position_normalized_subscribe(device, eye_position_callback, 0);
 
-    if assert_tobii_error(result)
+    if (assert_tobii_error(result))
           return 0;
 
     if (!updating) {
@@ -264,7 +264,7 @@ int stop() {
             printf("%s\n", tobii_error_message(result));
         assert(result == TOBII_ERROR_NO_ERROR);
     }
-    if cap.isOpened(){
+    if (cap.isOpened()){
         cap.close();
     }
     return 0;
