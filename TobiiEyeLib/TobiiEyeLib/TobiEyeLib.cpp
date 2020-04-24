@@ -121,9 +121,9 @@ struct Record {
     }
     void setFrame(cv::Mat f){
         frame = f;
-        selfie_time = timeInMilliseconds()
+        selfie_time = timeInMilliseconds();
         cv::Size s = f.size();
-        img_shape = Point3D(f.height, f.width, 3);
+        img_shape = Point3D(s.height, s.width, 3);
     }
     void print() {
         gaze.print();
@@ -157,11 +157,11 @@ cv::VideoCapture cap;
 
 // the tobii callbacks
 void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_data */) {
-    selfie_time = timeInMilliseconds();
+    tmp_record.selfie_time = timeInMilliseconds();
     tmp_record.setGaze(gaze_point);
     cap >> tmp_record.frame;
     cv::Size s = tmp_record.frame.size();
-    tmp_record.img_shape = Point3D(f.height, f.width, 3);
+    tmp_record.img_shape = Point3D(s.height, s.width, 3);
 }
 void gaze_origin_callback(tobii_gaze_origin_t const* gaze_origin, void* user_data) {
     tmp_record.setOrigin(gaze_origin);
@@ -265,7 +265,7 @@ int stop() {
         assert(result == TOBII_ERROR_NO_ERROR);
     }
     if (cap.isOpened()){
-        cap.close();
+        cap.release();
     }
     return 0;
 }
