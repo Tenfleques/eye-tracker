@@ -32,7 +32,7 @@ class TobiiWinGazeWatcher():
         self.tobiiEyeLib = cdll.LoadLibrary(tobii_dll_path)
         self.tobiiEyeLib.stop.restype = c_int
         self.tobiiEyeLib.start.restype = c_int
-        self.tobiiEyeLib.getLatest.restype = POINTER(Record)
+        self.tobiiEyeLib.get_latest.restype = POINTER(Record)
         self.tobiiEyeLib.start()
         
 
@@ -47,7 +47,7 @@ class TobiiWinGazeWatcher():
     def serve_until_stopped(self, stop):
         while not stop():
             try :
-                output = self.tobiiEyeLib.getLatest()
+                output = self.tobiiEyeLib.get_latest()
                 self.recent_gazes.appendleft(output[0])
                 del output
             except OSError as msg:

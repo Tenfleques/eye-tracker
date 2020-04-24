@@ -10,6 +10,6 @@ struct Record;
 
 extern "C" TOBIEYELIB_API int stop();
 
-extern "C" TOBIEYELIB_API int start();
+extern "C" TOBIEYELIB_API int start(int cam_index);
 
-extern "C" TOBIEYELIB_API Record* getLatest();
+extern "C" TOBIEYELIB_API Record* get_latest();

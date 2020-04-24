@@ -14,36 +14,22 @@ import numpy as np
 class DummyTobii:
     def start(self):
         pass
+
     def stop(self):
         pass
-    def getLatest(self):
-        r = Record()
-        r.sys_clock = -1
-        return [r]
 
-class Synced:    
-    cam_feed = None # cam feed thread
-    cam_cap = None # cam feed capture object 
-    cam_fps = None # frame rate/second in use for the camera 
-    
-    video_feed = None # video feed thread
-    vid_cap = None  # video feed capture object 
-    vid_fps = None # video traverse capture rate
-    
+    def get_latest(self):
+        return [Record()]
+
+
+class Synced:
     stop_feed = False
 
     # fast appends, 0(1)
-    FRAMES = {
-        "video": deque(),
-        "cam" : deque()
-    }
+    FRAMES = deque()
 
-    def __init__(self, 
-                video_path,
-                save_dir = "sample", 
-                dll_path = "TobiiEyeLib/x64/Debug/TobiiEyeLib.dll", 
-                cam_index = 0, 
-                poll_wait = 10):
+    def __init__(self, video_path, save_dir="sample",
+                 dll_path="TobiiEyeLib/x64/Debug/TobiiEyeLib.dll", cam_index=0, poll_wait=10):
         
         screen_grab = ImageGrab.grab()
         self.SCREEN_SIZE = screen_grab.size
@@ -53,230 +39,153 @@ class Synced:
             self.tobii_lib = cdll.LoadLibrary(dll_path)
             self.tobii_lib.stop.restype = c_int
             self.tobii_lib.start.restype = c_int
-            self.tobii_lib.getLatest.restype = POINTER(Record)
+            self.tobii_lib.get_latest.restype = POINTER(Record)
         except OSError:
+            print("os error")
             self.tobii_lib = DummyTobii()
-            
 
         self.save_dir = save_dir
         self.img_dir = save_dir
         self.cam_index = cam_index
         self.video_path = video_path
+        self.video_name = None
 
-        self.video_name = "video"
+        self.cam_feed = None  # cam feed thread
+        self.cam_cap = None  # cam feed capture object
+        self.cam_fps = None  # frame rate/second in use for the camera
 
-        if video_path:
-            self.video_name = video_path.split(os.sep)[-1]
+        self.vid_cap = None  # video feed capture object
+        self.vid_fps = None  # video traverse capture rate
 
     def log_frames(self):
         # index
-        last_cam_frame = self.FRAMES["cam"]
+        last_cam_frame = self.FRAMES
         if len(last_cam_frame):
             last_cam_frame = last_cam_frame[-1]
             tracker = last_cam_frame["tracker"]
             tm = last_cam_frame["time"]
             gaze_time = tracker["timestamp"]
 
-            print("gaze_time: {}, time: {}, acc: {} \n gaze: {}\n\n".format(gaze_time, tm, abs(gaze_time - tm), tracker["gaze"]))
+            print("gaze_time: {}, time: {}, acc: {} \n gaze: {}\n\n".format(gaze_time,
+                                                                            tm, abs(gaze_time - tm), tracker["gaze"]))
 
-    def start(self, video_fps=None, cam_fps=None, cb=None):
+    def start(self, video_fps=None, replay=False):
         if not os.path.isfile(self.video_path):
-            print("video file not found")
-            return 
-
-        self.cam_cap = cv2.VideoCapture(self.cam_index)
-        self.vid_cap = cv2.VideoCapture(self.video_path)
-
-        if video_fps:
-            self.vid_fps = video_fps
-        else:
-            # set the video determined fps
-            self.vid_fps = self.vid_cap.get(cv2.CAP_PROP_FPS)
-
-        if cam_fps:
-            self.cam_fps = cam_fps
-        else:
-            # set the cam determined fps
-            self.cam_fps = self.cam_cap.get(cv2.CAP_PROP_FPS)
-
-        self.vid_feed = threading.Thread(target=self.frame_capture, 
-                        args=(self.vid_cap, 
-                                self.vid_processor, 
-                                lambda : self.stop_feed,
-                                "video"))
-
-        self.cam_feed = threading.Thread(target=self.frame_capture, 
-                        args=(self.cam_cap, 
-                                self.cam_processor, 
-                                lambda : self.stop_feed,
-                                "cam"))
-        
-        try:
-            self.img_dir = os.path.join(self.save_dir, "images")
-            os.makedirs(self.img_dir, exist_ok=True)
-            self.stop_feed = False
-            # start the devices
-            self.tobii_lib.start()
-            self.cam_feed.start()
-            self.vid_feed.start()
-            
-            while self.all_ready():
-                if cb == None:
-                    self.log_frames()
-                else:
-                    cb(self.FRAMES)
-            
-            self.stop_feed = True
-            self.stop()
-            # When ctrl+c is received
-        except KeyboardInterrupt:
-            self.stop()
-
-    def replay(self, video_fps=None):
-        if not os.path.isfile(self.video_path):
-            print("video file not found")
-            return 
-
+            print("the video file not found")
+            return
         self.vid_cap = None
         self.vid_cap = cv2.VideoCapture(self.video_path)
-        self.video_name = "replay: " + self.video_name
+        self.video_name = "replay: {}".format(self.video_path.split(os.sep)[-1])
 
         if video_fps:
             self.vid_fps = video_fps
         else:
             # set the video determined fps
             self.vid_fps = self.vid_cap.get(cv2.CAP_PROP_FPS)
-
-        self.vid_feed = threading.Thread(target=self.frame_capture, 
-                        args=(self.vid_cap, 
-                                self.vid_processor, 
-                                lambda : self.stop_feed,
-                                "replay",
-                                True
-                                ))
         
         try:
-            self.stop_feed = False
-            self.vid_feed.start()
-            
-            while self.vid_cap.isOpened():
-                continue
-            
-            self.stop_feed = True
 
-            if self.vid_feed.is_alive:
-                self.vid_feed.join()
+            self.stop_feed = False
+            if not replay:
+                self.video_name = self.video_path.split(os.sep)[-1]
+                self.img_dir = os.path.join(self.save_dir, "images")
+                os.makedirs(self.img_dir, exist_ok=True)
+                # start the devices
+                self.tobii_lib.start()
+                self.frame_capture(self.vid_cap, self.record_processor, lambda: self.stop_feed, replay)
+            else:
+                self.frame_capture(self.vid_cap, self.replay_processor, lambda: self.stop_feed, replay)
+
+            self.stop_feed = True
+            self.stop(replay)
+
             # When ctrl+c is received
         except KeyboardInterrupt:
-            if self.vid_feed.is_alive:
-                self.vid_feed.join()
+            self.stop(replay)
 
-    def stop(self):
-        self.stop_feed = True
-        if self.cam_feed.is_alive:
+        except Exception as e:
+            print(e)
+            self.stop(replay)
+
+    def replay(self, video_fps=None):
+        self.start(video_fps, True)
+
+    def stop(self, replay=False):
+        if not replay:
             self.tobii_lib.stop()
-            self.cam_feed.join()
-        if self.vid_feed.is_alive:
-            self.vid_feed.join()
-
-        filename = os.path.join(self.save_dir, "results.json")
-        with open(filename, "w") as f:
-            res = {
-                "video" : list(self.FRAMES["video"]),
-                "cam" : list(self.FRAMES["cam"])
-            }
-            f.write(json.dumps(res))
-            f.close()
-        
+            filename = os.path.join(self.save_dir, "results.json")
+            with open(filename, "w") as f:
+                f.write(json.dumps(list(self.FRAMES)))
+                f.close()
         cv2.destroyAllWindows()
 
-    def vid_processor(self, 
-                        frame_id, frame, gaze, replay=False):
-        
-        cv2.namedWindow(self.video_name, cv2.WND_PROP_FULLSCREEN)
-        cv2.setWindowProperty(self.video_name,cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
-        font = cv2.FONT_HERSHEY_PLAIN
-
-        if not replay:
-            self.FRAMES["video"].append({
-                "frame" : frame_id,
-                "time" : time.time(),
-                "tracker" : gaze.toDict()
+    def record_processor(self, frame_id):
+        gaze = self.tobii_lib.get_latest()[0]
+        if gaze.sys_clock:
+            self.FRAMES.append({
+                "frame": frame_id,
+                "time": time.time(),
+                "tracker": gaze.to_dict()
             })
+        return
+
+    def replay_processor(self, frame_id, frame):
+        font = cv2.FONT_HERSHEY_PLAIN
+        color = (200, 20, 20)
+        font_size = 1.0
+
+        x = self.SCREEN_SIZE[0] - 500
+        frame = np.zeros(shape=(self.SCREEN_SIZE[1], self.SCREEN_SIZE[0], 3), dtype=np.uint8)
+        frame[:, :, :] = 150
+
+        if frame_id < len(self.FRAMES):
+            cap_frame = self.FRAMES[frame_id]
+            tracker = cap_frame["tracker"]
+            tm = cap_frame["time"]
+            gaze_time = tracker["timestamp"]
+            xyv = tracker["gaze"]
+
+            details = "frame: {}, time diff {:.4}".format(frame_id, abs(gaze_time - tm))
+            cv2.putText(frame, details, (x, 40), font, font_size, color, 1, cv2.LINE_AA)
+
+            details = "gaze: ({:.4},{:.4}), valid: {}".format(xyv["x"], xyv["y"], xyv["valid"])
+            cv2.putText(frame, details, (x, 90), font, font_size, color, 1, cv2.LINE_AA)
+
+            if xyv["valid"]:
+                if 0.0 < xyv["x"] < 1.0 and 0.0 < xyv["y"] < 1.0:
+                    x1 = int(self.SCREEN_SIZE[0] * xyv["x"]) - 5
+                    y1 = int(self.SCREEN_SIZE[1] * xyv["y"]) - 5
+                    box_w = 10
+                    box_h = 10
+                    cv2.rectangle(frame, (x1, y1), (x1+box_w, y1+box_h), color, -1)
+
         else:
-            # it's replay time 
-            x = self.SCREEN_SIZE[0] - 500
-            frame = np.zeros(shape=(self.SCREEN_SIZE[1],self.SCREEN_SIZE[0], 3), dtype=np.uint8)
-            frame[:,:,:] = 150
+            details = "no gaze data for the frame: {}".format(frame_id)
+            cv2.putText(frame, details, (x, 40), font, font_size, color, 1, cv2.LINE_AA)
 
-            if frame_id < len(self.FRAMES["video"]):
-                cap_frame = self.FRAMES["video"][frame_id]
-                tracker = cap_frame["tracker"]
-                tm = cap_frame["time"]
-                gaze_time = tracker["timestamp"]
-                xyv = tracker["gaze"]
-
-                details = "frame: {}, time diff {:.4}".format(frame_id, abs(gaze_time - tm))
-                cv2.putText(frame, details, (x,40), font, 1.0, (200,20,20), 1, cv2.LINE_AA)
-
-                details = "gaze: ({:.4},{:.4}), valid: {}".format(xyv["x"], xyv["y"], xyv["valid"])
-                cv2.putText(frame, details, (x,90), font, 1.0, (200,20,20), 1, cv2.LINE_AA)
-                
-                if xyv["valid"]:
-                    if 0.0 < xyv["x"] < 1.0 and 0.0 < xyv["y"] < 1.0:
-                        x1 = int(self.SCREEN_SIZE[0] * xyv["x"]) - 5
-                        y1 = int(self.SCREEN_SIZE[1] * xyv["y"]) - 5
-                        box_w = 10
-                        box_h = 10
-                        cv2.rectangle(frame, (x1, y1), (x1+box_w, y1+box_h), (255,20,0), -1)
-
-            else:
-                details = "no gaze data for frame: {}".format(frame_id)
-                cv2.putText(frame, details, (x,40), font, 1.0, (200,20,20), 1, cv2.LINE_AA)
-
-        
         cv2.imshow(self.video_name, frame)
-        waitms = 30
-        if self.vid_fps:
-            waitms = int(1000.0/self.vid_fps)
-        return cv2.waitKey(waitms)
-
-        
-    def cam_processor(self, frame_id, frame, gaze, replay=False):
-        if replay:
-            return
-
-        self.FRAMES["cam"].append({
-                        "time" : time.time(),
-                        "tracker" : gaze.toDict()
-                    })
-        image_path = os.path.join(self.img_dir, "frame-{}.png".format(frame_id))
-
-        cv2.imwrite(image_path, frame)
-        waitms = 30
-        if self.cam_fps:
-            waitms = int(1000.0/self.cam_fps)
-        return cv2.waitKey(waitms)
 
     def all_ready(self):
-        gaze = self.tobii_lib.getLatest()[0]
-        if not self.cam_cap.isOpened():
+        gaze = self.tobii_lib.get_latest()[0]
+
+        if not gaze.sys_clock:
+            print("tobii device not ready")
+            return
+
+        if not self.vid_cap.isOpened():
+            print("video not ready")
             return False
 
-        ret, _ = self.cam_cap.read()
+        return True
 
-        return self.vid_cap.isOpened() and ret and gaze.sys_clock
-
-    def frame_capture(self, cap, cb, should_stop, name = "", replay=
-     False):
+    def frame_capture(self, cap, cb, should_stop, replay=False):
         frame_id = 0
-        st = time.time()
-        
+
         if not replay:
             ready = False
             # wait for all to be ready for 10 seconds, longer than that give up
             for i in range(self.poll_wait):
-                print("{} polling for other devices ... {}".format(name, i))
+                print("polling for the devices ... {}".format(i))
                 sys.stdout.flush()
                 if self.all_ready():
                     ready = True
@@ -290,43 +199,45 @@ class Synced:
             print("got tired of waiting...")
             sys.stdout.flush()
             return
+        waits = 30
+        if self.vid_fps:
+            waits = int(1000.0/self.vid_fps)
 
+        cv2.namedWindow(self.video_name, cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty(self.video_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+        st = time.time()
         while cap.isOpened():
             if should_stop():
                 break
-            # checks all ready only in recording mode
-            if not replay:
-                if not self.all_ready():
-                    break
-
             ret, frame = cap.read()
+            if frame_id == 0:
+                st = time.time()
             if not ret:
                 break
             # get tobii position only if in recording mode
-            key = None
             if not replay:
-                gaze = self.tobii_lib.getLatest()[0]
-                if gaze.sys_clock:
-                    key = cb(frame_id, frame, gaze, replay)
+                cb(frame_id)
+                cv2.imshow(self.video_name, frame)
             else:
-                key = cb(frame_id, frame, None, replay)
-            
+                cb(frame_id, frame)
+
+            key = cv2.waitKey(waits)
             if key == ord('Q') or key == ord('q'):
                 break
             frame_id += 1
 
-        # if any video thread is finished close
         cap.release()
+        cv2.destroyWindow(self.video_name)
+
         if time.time() - st:
             factual_rate = frame_id/(time.time() - st)
-            print("{}: factual rate used: {}".format(name, factual_rate))
+            print("factual rate used: {}".format(factual_rate))
             sys.stdout.flush()
-        
-def silent_cb(x):
-    pass
+
 
 if __name__ == "__main__":
-    synced = Synced("data\\stimulus_sample.mp4")
-    synced.start(video_fps=1000, cb= silent_cb)
+    synced = Synced("./data/stimulus_sample.mp4")
+    synced.start(video_fps=1000)
     print("start replay")
     synced.replay(video_fps=1000)

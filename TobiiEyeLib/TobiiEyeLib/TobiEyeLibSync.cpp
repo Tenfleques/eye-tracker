@@ -7,8 +7,7 @@
 #include <thread>
 #include <chrono>
 #include "TobiEyeLib.h"
-#include <windows.h
-#include "opencv2/opencv.hpp"
+#include <windows.h>
 
 double timeInMilliseconds() {
     SYSTEMTIME tim;
@@ -119,10 +118,6 @@ struct Record {
         pos_timestamp_us = eye_pos->timestamp_us;
         sys_clock = timeInMilliseconds();
     }
-    void setFrame(Mat f){
-        frame = f;
-        selfie_time = timeInMilliseconds()
-    }
     void print() {
         gaze.print();
         origin.print();
@@ -134,30 +129,17 @@ struct Record {
     int64_t gaze_timestamp_us = 0,
         origin_timestamp_us = 0,
         pos_timestamp_us = 0;
-    double sys_clock = timeInMilliseconds(), selfie_time = timeInMilliseconds();
+    double sys_clock = timeInMilliseconds();
     bool gaze_valid = false, pos_valid = false, origin_valid = false;
-    Mat frame;
 };
 
-std::thread update_thread;
-bool updating = false;
-// Create API
-tobii_api_t* api = NULL;
-// Connect to the first tracker found
-tobii_device_t* device = NULL;
-// status flag
-tobii_error_t result = tobii_api_create(&api, NULL, NULL);
-// the temporary record to update in the callbacks
+// the temporary record to update in the callbacks 
 Record tmp_record;
-// camera object
-cv2.VideoCapture cap;
 
-// the tobii callbacks
 void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_data */) {
-    selfie_time = timeInMilliseconds();
     tmp_record.setGaze(gaze_point);
-    cap >> tmp_record.frame;
 }
+
 void gaze_origin_callback(tobii_gaze_origin_t const* gaze_origin, void* user_data) {
     tmp_record.setOrigin(gaze_origin);
 }
@@ -173,6 +155,16 @@ void url_receiver(char const* url, void* user_data){
         strcpy(buffer, url);
 }
 
+std::thread update_thread;
+bool updating = false;
+// Create API
+tobii_api_t* api = NULL;
+// Connect to the first tracker found
+tobii_device_t* device = NULL;
+// status flag 
+tobii_error_t result = tobii_api_create(&api, NULL, NULL);
+
+
 void updateRecords() {
     while (updating) {
         // Optionally block this thread until data is available. Especially useful if running in a separate thread.
@@ -187,27 +179,20 @@ void updateRecords() {
     }
 }
 
-bool assert_tobii_error(tobii_error_t result){
-    if (result != TOBII_ERROR_NO_ERROR) {
+int start() {
+    if (result != TOBII_ERROR_NO_ERROR) 
         printf("%s\n", tobii_error_message(result));
-        return false;
-    }
-    return true;
-}
-int start(int cam_index = 0) {
-    if(!cap.open(cam_index)){
-        printf("Error: Camera error \n");
-        return 0;
-    }
-    if assert_tobii_error(result)
-        return 0;
+
+    assert(result == TOBII_ERROR_NO_ERROR);
 
     // Enumerate devices to find connected eye trackers, keep the first
     char url[256] = { 0 };
     result = tobii_enumerate_local_device_urls(api, url_receiver, url);
+    
 
-    if assert_tobii_error(result)
-          return 0;
+    if (result != TOBII_ERROR_NO_ERROR)
+        printf("%s\n", tobii_error_message(result));
+    assert(result == TOBII_ERROR_NO_ERROR);
 
     if (*url == '\0'){
         printf("Error: No device found\n");
@@ -216,23 +201,24 @@ int start(int cam_index = 0) {
 
     result = tobii_device_create(api, url, TOBII_FIELD_OF_USE_INTERACTIVE, &device);
 
-    if assert_tobii_error(result)
-          return 0;
+    if (result != TOBII_ERROR_NO_ERROR)
+        printf("%s\n", tobii_error_message(result));
+    assert(result == TOBII_ERROR_NO_ERROR);
 
     // Subscribe to gaze data
     result = tobii_gaze_point_subscribe(device, gaze_point_callback, 0);
     result = tobii_gaze_origin_subscribe(device, gaze_origin_callback, 0);
     result = tobii_eye_position_normalized_subscribe(device, eye_position_callback, 0);
 
-    if assert_tobii_error(result)
-          return 0;
+    if (result != TOBII_ERROR_NO_ERROR)
+        printf("%s\n", tobii_error_message(result));
+    assert(result == TOBII_ERROR_NO_ERROR);
 
     if (!updating) {
         updating = true;
         update_thread = std::thread(updateRecords);
     }
-    update_thread.joinable();
-    return 1;
+    return update_thread.joinable();
 }
 
 int stop() {
@@ -259,12 +245,10 @@ int stop() {
             printf("%s\n", tobii_error_message(result));
         assert(result == TOBII_ERROR_NO_ERROR);
     }
-    if cap.isOpened(){
-        cap.close();
-    }
+
     return 0;
 }
 
-Record* get_latest() {
+Record* getLatest() {
     return &tmp_record;
 }
