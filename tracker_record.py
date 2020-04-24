@@ -1,5 +1,7 @@
-from ctypes import cdll, c_float, c_bool, c_double, c_int, c_int64, Structure, POINTER
+from ctypes import cdll, c_float, c_bool, c_double, c_int, c_int64, c_ushort, cast, c_uint16, Structure, POINTER
 import time
+import cv2
+import numpy as np
 
 
 class Point2D(Structure): 
@@ -39,7 +41,8 @@ class Record(Structure):
     _fields_ = [('gaze', Point2D), ('origin', Eye), ('pos', Eye),
                 ('gaze_timestamp_us', c_int64), ('origin_timestamp_us', c_int64),
                 ('pos_timestamp_us', c_int64), ('sys_clock', c_double),
-                ('gaze_valid', c_bool), ('pos_valid', c_bool), ('origin_valid', c_bool)]
+                ('gaze_valid', c_bool), ('pos_valid', c_bool), ('origin_valid', c_bool),
+                ('frame', POINTER(c_ushort)), ('img_shape', Point3D)]
 
     def __init__(self):
         self.origin_timestamp_us = -1
@@ -49,6 +52,12 @@ class Record(Structure):
         self.gaze_valid = False
         self.pos_valid = False
         self.origin_valid = False
+
+    def imwrite(self, path):
+        if path:
+            # frame = np.ctypeslib.as_array(cast(self.frame, POINTER(c_uint16)),
+            #                               shape=(self.img_shape.x,self.img_shape.y, self.img_shape.z )).copy()
+            cv2.imwrite(path, self.frame)
 
     def to_dict(self):
         return {

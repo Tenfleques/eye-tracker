@@ -119,9 +119,11 @@ struct Record {
         pos_timestamp_us = eye_pos->timestamp_us;
         sys_clock = timeInMilliseconds();
     }
-    void setFrame(Mat f){
+    void setFrame(cv::Mat f){
         frame = f;
         selfie_time = timeInMilliseconds()
+        cv::Size s = f.size();
+        img_shape = Point3D(f.height, f.width, 3)
     }
     void print() {
         gaze.print();
@@ -136,7 +138,8 @@ struct Record {
         pos_timestamp_us = 0;
     double sys_clock = timeInMilliseconds(), selfie_time = timeInMilliseconds();
     bool gaze_valid = false, pos_valid = false, origin_valid = false;
-    Mat frame;
+    cv::Mat frame;
+    Point3D img_shape;
 };
 
 std::thread update_thread;
@@ -150,13 +153,15 @@ tobii_error_t result = tobii_api_create(&api, NULL, NULL);
 // the temporary record to update in the callbacks
 Record tmp_record;
 // camera object
-cv2.VideoCapture cap;
+cv::VideoCapture cap;
 
 // the tobii callbacks
 void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_data */) {
     selfie_time = timeInMilliseconds();
     tmp_record.setGaze(gaze_point);
     cap >> tmp_record.frame;
+    cv::Size s = tmp_record.frame.size();
+    tmp_record.img_shape = Point3D(f.height, f.width, 3)
 }
 void gaze_origin_callback(tobii_gaze_origin_t const* gaze_origin, void* user_data) {
     tmp_record.setOrigin(gaze_origin);
