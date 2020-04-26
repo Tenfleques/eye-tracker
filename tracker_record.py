@@ -1,13 +1,14 @@
 from ctypes import cdll, c_float, c_bool, c_double, c_int, c_int64, c_ushort, cast, c_uint16, Structure, POINTER
 import time
-import cv2
 import numpy as np
 
 
 class Point2D(Structure): 
     _fields_ = [('x', c_float), ('y', c_float)]
-    x = .0
-    y = .0
+
+    def __init__(self):
+        self.x = np.random.random_sample()
+        self.y = np.random.random_sample()
 
     @classmethod
     def from_param(cls, self):
@@ -18,7 +19,9 @@ class Point2D(Structure):
 
 class Point3D(Point2D):
     _fields_ = [('z', c_float)]
-    z = .0
+
+    def __init__(self):
+        self.z = np.random.random_sample()
 
     @classmethod
     def from_param(cls, self):
@@ -41,10 +44,10 @@ class Record(Structure):
     _fields_ = [('gaze', Point2D), ('origin', Eye), ('pos', Eye),
                 ('gaze_timestamp_us', c_int64), ('origin_timestamp_us', c_int64),
                 ('pos_timestamp_us', c_int64), ('sys_clock', c_double),
-                ('gaze_valid', c_bool), ('pos_valid', c_bool), ('origin_valid', c_bool),
-                ('frame', POINTER(c_ushort)), ('img_shape', Point3D)]
+                ('gaze_valid', c_bool), ('pos_valid', c_bool), ('origin_valid', c_bool)]
 
     def __init__(self):
+        self.gaze = Point2D()
         self.origin_timestamp_us = -1
         self.gaze_timestamp_us = -1
         self.pos_timestamp_us = -1
@@ -52,12 +55,6 @@ class Record(Structure):
         self.gaze_valid = False
         self.pos_valid = False
         self.origin_valid = False
-
-    def imwrite(self, path):
-        if path:
-            # frame = np.ctypeslib.as_array(cast(self.frame, POINTER(c_uint16)),
-            #                               shape=(self.img_shape.x,self.img_shape.y, self.img_shape.z )).copy()
-            cv2.imwrite(path, self.frame)
 
     def to_dict(self):
         return {
@@ -135,9 +132,9 @@ if __name__ == "__main__":
 
     lib.start()
     i = 0
-    while i < 3:
+    while i < 10:
         output = lib.get_latest()
-        print(output[0].toString())
+        print(output[0].to_string())
         time.sleep(1)
         i += 1
 

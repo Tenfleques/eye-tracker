@@ -123,7 +123,7 @@ struct Record {
         frame = f;
         selfie_time = timeInMilliseconds();
         cv::Size s = f.size();
-        img_shape = Point3D(s.height, s.width, 3);
+        img_shape = Point3D((float)s.height, (float)s.width, 3.0);
     }
     void print() {
         gaze.print();
@@ -159,9 +159,11 @@ cv::VideoCapture cap;
 void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_data */) {
     tmp_record.selfie_time = timeInMilliseconds();
     tmp_record.setGaze(gaze_point);
-    cap >> tmp_record.frame;
-    cv::Size s = tmp_record.frame.size();
-    tmp_record.img_shape = Point3D(s.height, s.width, 3);
+    if (cap.isOpened()) {
+        cap >> tmp_record.frame;
+        cv::Size s = tmp_record.frame.size();
+        tmp_record.img_shape = Point3D((float)s.height, (float)s.width, 3.0);
+    }    
 }
 void gaze_origin_callback(tobii_gaze_origin_t const* gaze_origin, void* user_data) {
     tmp_record.setOrigin(gaze_origin);
@@ -192,45 +194,52 @@ void updateRecords() {
     }
 }
 
-bool assert_tobii_error(tobii_error_t result){
+bool assert_tobii_error(tobii_error_t result, const char* msg = "error"){
     if (result != TOBII_ERROR_NO_ERROR) {
-        printf("%s\n", tobii_error_message(result));
-        return false;
+        printf("%s % \n", tobii_error_message(result), msg);
+        return true;
     }
-    return true;
+    return false;
 }
-int start(int cam_index = 0) {
+
+int start(char* images_path, int cam_index = 0) {
+    // save the image path, in this folder we shall addd images
+
+    return start(cam_index);
+}
+
+int start(int cam_index ) {
     if(!cap.open(cam_index)){
         printf("Error: Camera error \n");
-        return 0;
+        //return 0;
     }
     if (assert_tobii_error(result))
-        return 0;
+        return -1;
 
     // Enumerate devices to find connected eye trackers, keep the first
     char url[256] = { 0 };
     result = tobii_enumerate_local_device_urls(api, url_receiver, url);
 
     if (assert_tobii_error(result))
-          return 0;
+          return -1;
 
     if (*url == '\0'){
         printf("Error: No device found\n");
-        return 0;
+        return -1;
     }
 
     result = tobii_device_create(api, url, TOBII_FIELD_OF_USE_INTERACTIVE, &device);
 
-    if (assert_tobii_error(result))
-          return 0;
+    if (assert_tobii_error(result, "device"))
+          return -1;
 
     // Subscribe to gaze data
     result = tobii_gaze_point_subscribe(device, gaze_point_callback, 0);
     result = tobii_gaze_origin_subscribe(device, gaze_origin_callback, 0);
     result = tobii_eye_position_normalized_subscribe(device, eye_position_callback, 0);
 
-    if (assert_tobii_error(result))
-          return 0;
+    if (assert_tobii_error(result, "subscription"))
+          return -1;
 
     if (!updating) {
         updating = true;
@@ -240,36 +249,48 @@ int start(int cam_index = 0) {
     return 1;
 }
 
+int start_saving(char* images_path, int cam_index) {
+    return start(cam_index);
+}
+
 int stop() {
     if (updating) {
         updating = false;
         update_thread.join();
     }
 
+    if (cap.isOpened()) {
+        cap.release();
+    }
+
     // Cleanup
     if (device != NULL) {
         result = tobii_gaze_point_unsubscribe(device);
-        if (result != TOBII_ERROR_NO_ERROR)
-            printf("%s\n", tobii_error_message(result));
-        assert(result == TOBII_ERROR_NO_ERROR);
+        if (assert_tobii_error(result, "unsubscription"))
+            return result;
 
         result = tobii_device_destroy(device);
-        if (result != TOBII_ERROR_NO_ERROR)
-            printf("%s\n", tobii_error_message(result));
-        assert(result == TOBII_ERROR_NO_ERROR);
-    }
+        if (assert_tobii_error(result, "dev destroy "))
+            return result;
+    }       
     if (api != NULL) {
         result = tobii_api_destroy(api);
-        if (result != TOBII_ERROR_NO_ERROR)
-            printf("%s\n", tobii_error_message(result));
-        assert(result == TOBII_ERROR_NO_ERROR);
-    }
-    if (cap.isOpened()){
-        cap.release();
+        if (assert_tobii_error(result, "api destroy "))
+            return result;
     }
     return 0;
 }
 
 Record* get_latest() {
+    return &tmp_record;
+}
+
+
+Record* get_latest_frame(int frame_id) {
+    // save current image frame as image-{frame_id}.png
+    return &tmp_record;
+}
+
+Record* get_records(int frame_id) {
     return &tmp_record;
 }
