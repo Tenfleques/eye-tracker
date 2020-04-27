@@ -118,8 +118,9 @@ void playVideo() {
     cv::destroyWindow("test");
 }
 int main() {
-    cout << start(0);
-    playVideo();
-    stop();
+    //const char* dir = std::string("sample/images").c_str();
+    //cout << start(0, dir);
+    //playVideo();
+    //stop();
 }
 

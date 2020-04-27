@@ -9,6 +9,9 @@
 #include <windows.h>
 #include "opencv2/opencv.hpp"
 #include <string>
+#include <deque>
+
+using namespace cv;
 
 double timeInMilliseconds() {
     SYSTEMTIME tim;
@@ -119,12 +122,6 @@ struct Record {
         pos_timestamp_us = eye_pos->timestamp_us;
         sys_clock = timeInMilliseconds();
     }
-    void setFrame(cv::Mat f){
-        frame = f;
-        selfie_time = timeInMilliseconds();
-        cv::Size s = f.size();
-        img_shape = Point3D((float)s.height, (float)s.width, 3.0);
-    }
     void print() {
         gaze.print();
         origin.print();
@@ -138,7 +135,7 @@ struct Record {
         pos_timestamp_us = 0;
     double sys_clock = timeInMilliseconds(), selfie_time = timeInMilliseconds();
     bool gaze_valid = false, pos_valid = false, origin_valid = false;
-    cv::Mat frame;
+    
     Point3D img_shape;
 };
 
@@ -155,18 +152,30 @@ Record tmp_record;
 // camera object
 cv::VideoCapture cap;
 // images directory 
-char* user_images_path = NULL;
-int frame_id = 0;
+std::string user_images_path;
+std::deque<cv::Mat> Frames;
+std::deque<cv::Mat> all_frames(3);
 
+void save_to_file(int frame_id) {
+    // save current image frame as image-{frame_id}.png
+    if (!user_images_path.empty()) {
+        std::string filename = user_images_path + "\\frame-" + std::to_string(frame_id) + ".png";
+        if (!Frames[frame_id].empty()) {
+            cv::imwrite(filename, Frames[frame_id]);
+        }        
+    }
+    
+}
 // the tobii callbacks
 void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_data */) {
     tmp_record.selfie_time = timeInMilliseconds();
     tmp_record.setGaze(gaze_point);
-    if (cap.isOpened()) {
-        cap >> tmp_record.frame;
-        cv::Size s = tmp_record.frame.size();
-        tmp_record.img_shape = Point3D((float)s.height, (float)s.width, 3.0);
-    }    
+    cv::Mat f;
+    if(cap.isOpened()){
+        cap >> f;
+        all_frames.push_back(f);
+    }
+    
 }
 void gaze_origin_callback(tobii_gaze_origin_t const* gaze_origin, void* user_data) {
     tmp_record.setOrigin(gaze_origin);
@@ -250,15 +259,24 @@ int start(int cam_index, char* images_path) {
 
 
 int stop() {
+    std::deque<std::thread> threads;
     if (updating) {
         updating = false;
         update_thread.join();
+        for (int i = 0; i < Frames.size(); i ++) {
+            threads.push_back(std::thread(save_to_file, i));
+        }
+        printf("saving images \n");
     }
 
     if (cap.isOpened()) {
         cap.release();
     }
 
+    for (int i = 0; i < threads.size(); ++i) {
+        threads[i].join();
+    }
+    printf("saved  %Ii images \n", Frames.size());
     // Cleanup
     if (device != NULL) {
         result = tobii_gaze_point_unsubscribe(device);
@@ -277,17 +295,10 @@ int stop() {
     return 0;
 }
 
-/*Record* get_latest() {
-    return &tmp_record;
-}*/
-
-Record* get_latest(int frame_id) {
-    // save current image frame as image-{frame_id}.png
-    if (user_images_path) {
-        std::string filename = user_images_path;
-        filename += "/frame-" + std::to_string(frame_id) + ".png";
-        cv::imwrite(filename,tmp_record.frame);
-    }
+Record* get_latest(int f_id) {   
+    if (!all_frames.empty()) {
+        Frames.push_back(all_frames.back());
+    }    
     return &tmp_record;
 }
 

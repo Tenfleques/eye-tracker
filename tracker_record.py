@@ -1,9 +1,12 @@
-from ctypes import cdll, c_float, c_bool, c_double, c_int, c_int64, c_ushort, cast, c_uint16, Structure, POINTER
+from ctypes import c_float, c_bool, c_double, c_int64, Structure
 import time
+from ctypes import cdll, c_int, POINTER, c_char_p, c_char
 import numpy as np
 
+CString = POINTER(c_char)
 
-class Point2D(Structure): 
+
+class Point2D(Structure):
     _fields_ = [('x', c_float), ('y', c_float)]
 
     def __init__(self):
@@ -15,7 +18,7 @@ class Point2D(Structure):
         if not isinstance(self, cls):
             raise TypeError
         return self
-    
+
 
 class Point3D(Point2D):
     _fields_ = [('z', c_float)]
@@ -108,7 +111,7 @@ class Record(Structure):
                                                  self.pos_timestamp_us, self.pos_valid,
                                                  self.sys_clock, time.time())
         return message
-    
+
     def csv_string(self, frame_id, tm, diff):
         message = '{},{},{},{},{},{},{},{},{},{},' \
                   '{},{},{},{},{},{},{},{},{},{}'.format(frame_id, tm,
@@ -126,14 +129,20 @@ if __name__ == "__main__":
     tobii_dll_path = "TobiiEyeLib\\x64\\Debug\\TobiiEyeLib.dll"
     lib = cdll.LoadLibrary(tobii_dll_path)
 
+    lib.start.argtypes = [c_int, CString]
     lib.stop.restype = c_int
     lib.start.restype = c_int
+    lib.get_latest.argtypes = [c_int]
     lib.get_latest.restype = POINTER(Record)
 
-    lib.start()
+    # lib.stop.restype = c_int
+    # lib.start.restype = c_int
+    # lib.get_latest.restype = POINTER(Record)
+
+    lib.start(0, b"sample/images")
     i = 0
     while i < 10:
-        output = lib.get_latest()
+        output = lib.get_latest(i)
         print(output[0].to_string())
         time.sleep(1)
         i += 1
