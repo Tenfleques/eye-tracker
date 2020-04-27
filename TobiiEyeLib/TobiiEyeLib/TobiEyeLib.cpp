@@ -2,13 +2,13 @@
 #include <tobii/tobii_streams.h>
 #include <stdio.h>
 #include <assert.h>
-#include <string.h>
 #include <limits.h>
 #include <thread>
 #include <chrono>
 #include "TobiEyeLib.h"
 #include <windows.h>
 #include "opencv2/opencv.hpp"
+#include <string>
 
 double timeInMilliseconds() {
     SYSTEMTIME tim;
@@ -154,6 +154,9 @@ tobii_error_t result = tobii_api_create(&api, NULL, NULL);
 Record tmp_record;
 // camera object
 cv::VideoCapture cap;
+// images directory 
+char* user_images_path = NULL;
+int frame_id = 0;
 
 // the tobii callbacks
 void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_data */) {
@@ -202,13 +205,9 @@ bool assert_tobii_error(tobii_error_t result, const char* msg = "error"){
     return false;
 }
 
-int start(char* images_path, int cam_index = 0) {
-    // save the image path, in this folder we shall addd images
-
-    return start(cam_index);
-}
-
-int start(int cam_index ) {
+int start(int cam_index, char* images_path) {
+    // set the images directory 
+    user_images_path = images_path;
     if(!cap.open(cam_index)){
         printf("Error: Camera error \n");
         //return 0;
@@ -249,9 +248,6 @@ int start(int cam_index ) {
     return 1;
 }
 
-int start_saving(char* images_path, int cam_index) {
-    return start(cam_index);
-}
 
 int stop() {
     if (updating) {
@@ -281,13 +277,17 @@ int stop() {
     return 0;
 }
 
-Record* get_latest() {
+/*Record* get_latest() {
     return &tmp_record;
-}
+}*/
 
-
-Record* get_latest_frame(int frame_id) {
+Record* get_latest(int frame_id) {
     // save current image frame as image-{frame_id}.png
+    if (user_images_path) {
+        std::string filename = user_images_path;
+        filename += "/frame-" + std::to_string(frame_id) + ".png";
+        cv::imwrite(filename,tmp_record.frame);
+    }
     return &tmp_record;
 }
 

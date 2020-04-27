@@ -20,8 +20,10 @@ class DummyTobii:
     cap = None
     records = deque()
     frame = None
+    img_dir = None
+    frame_id = 0
 
-    def start(self, cam_index= 0):
+    def start(self, cam_index= 0, img_dir= ""):
         self.records.append(Record())
         self.cap = cv2.VideoCapture(cam_index)
         cam_thread = threading.Thread(target=self.cam_shots)
@@ -33,17 +35,21 @@ class DummyTobii:
             self.cap.release()
 
     def cam_shots(self):
-        while self.take_shots and self.cap.isOpened():
+        while self.take_shots and self.cap and self.cap.isOpened():
             ret, self.frame = self.cap.read()
             r = np
-            self.records.append(Record())
+            if self.img_dir:
+                cv2.imwrite("{}/frame-{}.png".format(self.img_dir, self.frame_id), self.frame)
+                self.frame_id += 1
+                
+            self.records.appendleft(Record())
 
     def stop(self):
         if self.cap.isOpened():
             self.cap.release()
 
     def get_latest(self, index=0):
-        return [self.records[index]]
+        return self.records
 
 
 def get_img_from_fig(fig, dpi=100):
@@ -86,12 +92,13 @@ class Synced:
 
         try:
             self.tobii_lib = cdll.LoadLibrary(dll_path)
-            self.tobii_lib.start.argtypes = [c_int]
+            self.tobii_lib.start.argtypes = [c_int, c_char_p]
             self.tobii_lib.stop.restype = c_int
             self.tobii_lib.start.restype = c_int
+            self.tobii_lib.get_latest.argtypes = c_char_p
             self.tobii_lib.get_latest.restype = POINTER(Record)
-        except OSError:
-            print("os error")
+        except OSError as err:
+            print("os error", err)
             self.tobii_lib = DummyTobii()
 
         self.save_dir = save_dir
@@ -173,7 +180,7 @@ class Synced:
                 self.img_dir = os.path.join(self.save_dir, "images")
                 os.makedirs(self.img_dir, exist_ok=True)
                 # start the devices
-                self.tobii_lib.start(0)
+                self.tobii_lib.start(0, self.img_dir)
                 self.frame_capture(self.vid_cap, self.record_processor, lambda: self.stop_feed, replay)
             else:
                 self.frame_capture(self.vid_cap, self.replay_processor, lambda: self.stop_feed, replay)
@@ -203,7 +210,7 @@ class Synced:
         cv2.destroyAllWindows()
 
     def record_processor(self, frame_id):
-        gaze = self.tobii_lib.get_latest()[0]
+        gaze = self.tobii_lib.get_latest(frame_id)[0]
         if gaze.sys_clock:
             self.FRAMES.append({
                 "frame": frame_id,
