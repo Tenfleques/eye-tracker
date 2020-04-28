@@ -272,17 +272,26 @@ class Synced:
 
     def record_processor(self, frame_id, frame):
         """
-
         :param frame_id:
         :param frame:
         :return:
         """
-        gaze = self.tobii_lib.get_latest(frame_id)[0]
-        if gaze.sys_clock:
+        tm = time.time()
+        tracker = self.tobii_lib.get_latest(frame_id)[0]
+        # check the query latency here, [recent test on VM gets x/1000 for [x < 9.0]
+        # latency = time.time() - tm
+        # print("latency {}".format(latency))
+        # sys.stdout.flush()
+
+        if tracker.sys_clock:
             self.FRAMES.append({
                 "frame": frame_id,
-                "time": time.time(),
-                "tracker": gaze.to_dict()
+                "time": tm,
+                "camera": {
+                    "timestamp": tracker.sys_clock,
+                    "frame": frame_id
+                },
+                "tracker": tracker.to_dict()
             })
 
         cv2.imshow(self.video_name, frame)
@@ -290,9 +299,9 @@ class Synced:
 
     def replay_processor(self, frame_id, frame):
         """
-        :param frame_id:
-        :param frame:
-        :return:
+        :param frame_id: int
+        :param frame: cv2::Mat
+        :return: None
         """
         font = cv2.FONT_HERSHEY_PLAIN
         color = [(100, 20, 20), (20, 100, 20), (20, 20, 100)]
@@ -366,7 +375,7 @@ class Synced:
 
     def all_ready(self):
         """
-        :return:
+        :return: Boolean
         """
         gaze = self.tobii_lib.get_latest(0)[0]
 
@@ -408,7 +417,7 @@ class Synced:
         if not ready:
             print("got tired of waiting...")
             sys.stdout.flush()
-            return
+            return -1
 
         waits = 30
         # in the event that vid_fps is undefined or 0 or None, escape division by zero
@@ -452,6 +461,8 @@ class Synced:
         if time.time() - st:
             factual_rate = frame_id / (time.time() - st)
             return factual_rate
+
+        return 0
 
 
 if __name__ == "__main__":
