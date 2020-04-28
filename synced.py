@@ -16,6 +16,7 @@ CString = POINTER(c_char)
 
 
 class DummyTobii:
+    """Dummy Tobii class to imitate the TobiiLib in the event of an error from the DLL, for testing only"""
     take_shots = False
     cam_shot = None
     cap = None
@@ -24,7 +25,7 @@ class DummyTobii:
     img_dir = None
     frame_id = 0
 
-    def start(self, cam_index=0, img_dir= ""):
+    def start(self, cam_index=0, img_dir=""):
         self.records.append(Record())
         self.cap = cv2.VideoCapture(cam_index)
         cam_thread = threading.Thread(target=self.cam_shots)
@@ -54,6 +55,10 @@ class DummyTobii:
 
 
 def get_img_from_fig(fig, dpi=100):
+    """converts a matplotlib figure image to cv2 image
+        fig: [Matplotlib Figure]
+        dpi: [int] the desired dpi of the image
+    """
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=dpi)
     buf.seek(0)
@@ -66,27 +71,38 @@ def get_img_from_fig(fig, dpi=100):
 
 
 class Synced:
+    """
+        Module that synchronizes video frames , Tobii tracker data and Camera frames.
+        Interfaces the DLL written in c++ in the TobiiLib project
+        Arguments:
+            video_path[String] path to the stimuli video source
+            save_dir[String] path to the output directory ["./sample"],
+            dll_path [String] path to the DLL ["./TobiiEyeLib/x64/Debug/TobiiEyeLib.dll"]
+            cam_index=0, poll_wait=10, bg_color=(255, 255, 255)
+    """
     stop_feed = False
 
-    # fast appends, 0(1)
+    # fast appends, 0(1) contains session data at the end of recording
     FRAMES = deque()
+
     stop_tobii_thread = None
-    track_gaze_real = False
 
     def __init__(self, video_path, save_dir="sample",
                  dll_path="TobiiEyeLib/x64/Debug/TobiiEyeLib.dll",
-                 cam_index=0, poll_wait=10, bg_color=(255, 255, 255), fore_color=(200, 200, 0)):
+                 cam_index=0, poll_wait=10, bg_color=(255, 255, 255)):
 
         screen_grab = ImageGrab.grab()
         self.SCREEN_SIZE = screen_grab.size
         self.bg_frame = np.zeros(shape=(self.SCREEN_SIZE[1], self.SCREEN_SIZE[0], 3), dtype=np.uint8)
         self.bg_color = bg_color
-        self.fore_color = fore_color
+        self.fore_color = (200, 200, 0)
         self.calc_fps = 0.0
         self.record_fps = 0.0
 
         self.poll_wait = poll_wait
         self.details_log = deque(maxlen=(self.SCREEN_SIZE[1] - 460) // 70)
+
+        # metric object for indicating the degree of sync between device data and stimuli frames
         self.metrics = {
             "mean": .0,
             "min": .0,
@@ -117,19 +133,19 @@ class Synced:
         self.vid_cap = None  # video feed capture object
         self.vid_fps = None  # video traverse capture rate
 
-    def log_frames(self):
-        # index
-        last_cam_frame = self.FRAMES
-        if len(last_cam_frame):
-            last_cam_frame = last_cam_frame[-1]
-            tracker = last_cam_frame["tracker"]
-            tm = last_cam_frame["time"]
-            gaze_time = tracker["timestamp"]
-
-            print("gaze_time: {}, time: {}, acc: {} \n gaze: {}\n\n".format(gaze_time,
-                                                                            tm, abs(gaze_time - tm), tracker["gaze"]))
+    def __del__(self):
+        """
+        :return:
+        """
+        if self.stop_tobii_thread is not None:
+            if self.stop_tobii_thread.is_alive():
+                self.stop_tobii_thread.join()
 
     def set_metrics(self):
+        """
+            creates chart indicative of the latency
+        :return:
+        """
         ll = max(1000, len(self.FRAMES))
         times = np.zeros(ll)
 
@@ -161,8 +177,28 @@ class Synced:
             "max": mx
         }
 
-    def start(self, video_fps=None, show_realtime_tracker=False, replay=False):
-        self.track_gaze_real = show_realtime_tracker
+    def log_frames(self):
+        """
+            helper function to visualize the frame progress, slows down the frame cycle
+        :return:
+        """
+        last_cam_frame = self.FRAMES
+        if len(last_cam_frame):
+            last_cam_frame = last_cam_frame[-1]
+            tracker = last_cam_frame["tracker"]
+            tm = last_cam_frame["time"]
+            gaze_time = tracker["timestamp"]
+
+            print("gaze_time: {}, time: {}, acc: {} \n gaze: {}\n\n".format(gaze_time,
+                                                                            tm, abs(gaze_time - tm), tracker["gaze"]))
+
+    def start(self, video_fps=None, replay=False):
+        """
+
+        :param video_fps:
+        :param replay:
+        :return:
+        """
         if not os.path.isfile(self.video_path):
             print("the video file not found")
             return
@@ -185,9 +221,14 @@ class Synced:
                 os.makedirs(self.img_dir, exist_ok=True)
                 # start the devices
                 self.tobii_lib.start(0, bytes(self.img_dir, encoding='utf-8'))
-                self.frame_capture(self.vid_cap, self.record_processor, lambda: self.stop_feed, replay)
+                factual_fps = self.frame_capture(self.vid_cap, self.record_processor, lambda: self.stop_feed, replay)
             else:
-                self.frame_capture(self.vid_cap, self.replay_processor, lambda: self.stop_feed, replay)
+                factual_fps = self.frame_capture(self.vid_cap, self.replay_processor, lambda: self.stop_feed, replay)
+
+            if not replay:
+                self.calc_fps = factual_fps
+            if factual_fps:
+                print("factual rate used: {}".format(factual_fps))
 
             self.stop_feed = True
             self.stop(replay)
@@ -201,10 +242,20 @@ class Synced:
             self.stop(replay)
 
     def replay(self, video_fps=None):
+        """
+
+        :param video_fps:
+        :return:
+        """
         self.set_metrics()
         self.start(video_fps, True)
 
     def stop(self, replay=False):
+        """
+
+        :param replay:
+        :return:
+        """
         if not replay:
             if self.stop_tobii_thread is not None:
                 if self.stop_tobii_thread.is_alive():
@@ -219,12 +270,13 @@ class Synced:
                 f.close()
         cv2.destroyAllWindows()
 
-    def __del__(self):
-        if self.stop_tobii_thread is not None:
-            if self.stop_tobii_thread.is_alive():
-                self.stop_tobii_thread.join()
-
     def record_processor(self, frame_id, frame):
+        """
+
+        :param frame_id:
+        :param frame:
+        :return:
+        """
         gaze = self.tobii_lib.get_latest(frame_id)[0]
         if gaze.sys_clock:
             self.FRAMES.append({
@@ -233,25 +285,15 @@ class Synced:
                 "tracker": gaze.to_dict()
             })
 
-        if self.track_gaze_real:
-            x, y, w, h = cv2.getWindowImageRect(self.video_name)
-            self.bg_frame[:, :x, :] = self.bg_color
-            self.bg_frame[x:w, y:h, :] = cv2.resize(frame, dsize=(h, w), interpolation=cv2.INTER_CUBIC)
-            xyv = gaze["gaze"]
-            color = (20, 20, 100)
-            x1 = int(self.SCREEN_SIZE[0] * xyv["x"]) - 10
-            y1 = int(self.SCREEN_SIZE[1] * xyv["y"]) - 10
-            cv2.circle(self.bg_frame, (x1, y1), 20, color, thickness=2, lineType=8, shift=0)
-            # horizontal
-            cv2.line(self.bg_frame, (x1 - 10, y1), (x1 + 10, y1), color, thickness=1.5, lineType=8, shift=0)
-            # vertical
-            cv2.line(self.bg_frame, (x1, y1 - 10), (x1, y1 + 10), color, thickness=1.5, lineType=8, shift=0)
-            cv2.imshow(self.video_name, self.bg_frame)
-        else:
-            cv2.imshow(self.video_name, frame)
+        cv2.imshow(self.video_name, frame)
         return
 
     def replay_processor(self, frame_id, frame):
+        """
+        :param frame_id:
+        :param frame:
+        :return:
+        """
         font = cv2.FONT_HERSHEY_PLAIN
         color = [(100, 20, 20), (20, 100, 20), (20, 20, 100)]
         font_size = 1.1
@@ -287,18 +329,24 @@ class Synced:
 
             if xyv["valid"]:
                 if True:  # 0.0 < xyv["x"] < 1.0 and 0.0 < xyv["y"] < 1.0:
-                    x1 = int(self.SCREEN_SIZE[0] * xyv["x"]) - 10
-                    y1 = int(self.SCREEN_SIZE[1] * xyv["y"]) - 10
+                    x1 = int(self.SCREEN_SIZE[0] * xyv["x"])
+                    y1 = int(self.SCREEN_SIZE[1] * xyv["y"])
                     # box_w = 20
                     # box_h = 20
-                    cv2.circle(self.bg_frame, (x1, y1), 20, color[2], thickness=2, lineType=8, shift=0)
-                    # cv2.rectangle(self.bg_frame, (x1, y1), (x1 + box_w, y1 + box_h), color[2], -1)
-                    # horizontal
-                    cv2.line(self.bg_frame, (max(x1 - 10, 0), y1), (x1 + 10, y1),
-                             color[1], thickness=1.5, lineType=8, shift=0)
-                    # vertical
-                    cv2.line(self.bg_frame, (x1, max(y1 - 10, 0)), (x1, y1 + 10),
-                             color[1], thickness=1.5, lineType=8, shift=0)
+                    # create target circle
+                    radius = min(20, self.SCREEN_SIZE[0] - x1, self.SCREEN_SIZE[1] - y1)
+                    cv2.circle(self.bg_frame, (x1, y1), radius,
+                               color[2], thickness=2, lineType=8, shift=0)
+                    # # cv2.rectangle(self.bg_frame, (x1, y1), (x1 + box_w, y1 + box_h), color[2], -1)
+                    radius = max(min(radius - 5, radius - 10, radius - 15),  0)
+                    # horizontal line
+                    a, b = (x1 - radius, y1), (x1 + radius, y1)
+                    cv2.line(self.bg_frame, a, b,
+                             color[1], thickness=1, lineType=8, shift=0)
+                    # vertical line
+                    a, b = (x1, y1 - radius), (x1, y1 + radius)
+                    cv2.line(self.bg_frame, a, b,
+                             color[1], thickness=1, lineType=8, shift=0)
 
         else:
             details = "no gaze data for the frame: {}".format(frame_id)
@@ -317,11 +365,14 @@ class Synced:
         cv2.imshow(self.video_name, self.bg_frame)
 
     def all_ready(self):
+        """
+        :return:
+        """
         gaze = self.tobii_lib.get_latest(0)[0]
 
         if not gaze.sys_clock:
             print("tobii device not ready")
-            return
+            return False
 
         if not self.vid_cap.isOpened():
             print("video not ready")
@@ -330,6 +381,14 @@ class Synced:
         return True
 
     def frame_capture(self, cap, cb, should_stop, replay=False):
+        """
+        The process for showing frames on the screen during recording or replay
+        :param cap: [CV2::VideoCapture] from which frames are read
+        :param cb: [Function] The callback function to process the captured frame
+        :param should_stop: [Function] the function to signal the process to stop if it is in thread
+        :param replay: [Boolean]
+        :return:
+        """
         frame_id = 0
 
         if not replay:
@@ -350,10 +409,13 @@ class Synced:
             print("got tired of waiting...")
             sys.stdout.flush()
             return
+
         waits = 30
+        # in the event that vid_fps is undefined or 0 or None, escape division by zero
         if self.vid_fps:
             waits = int(1000.0 / self.vid_fps)
 
+        # set the video to full screen
         cv2.namedWindow(self.video_name, cv2.WND_PROP_FULLSCREEN)
         cv2.setWindowProperty(self.video_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
@@ -362,35 +424,39 @@ class Synced:
 
             if should_stop():
                 break
+            # read the next frame
             ret, frame = cap.read()
-            if frame_id == 0:
-                st = time.time()
+
             if not ret:
                 break
-            # get tobii position only if in recording mode
-            if not replay:
-                cb(frame_id, frame)
-            else:
-                cb(frame_id, frame)
+
+            # first few frames takes longer,
+            # for a truthful Factual FPS reset time for every frame less than the first stable frame
+            if frame_id < 5:
+                st = time.time()
+
+            cb(frame_id, frame)
 
             key = cv2.waitKey(waits)
+
+            # signal stop if user press Q, or q
             if key == ord('Q') or key == ord('q'):
                 break
+            # increment the frame index
             frame_id += 1
 
+        # release the video capture
         cap.release()
 
+        # calculate the Factual Rate used
         if time.time() - st:
             factual_rate = frame_id / (time.time() - st)
-            if not replay:
-                self.calc_fps = factual_rate
-            print("factual rate used: {}".format(factual_rate))
-            sys.stdout.flush()
+            return factual_rate
 
 
 if __name__ == "__main__":
     synced = Synced("./data/stimulus_sample.mp4",
                     dll_path="TobiiEyeLib/x64/Release/TobiiEyeLib.dll",)
-    synced.start(video_fps=1000, show_realtime_tracker=False)
+    synced.start(video_fps=1000)
     # print("start replay")
-    # synced.replay(video_fps=30)
+    synced.replay(video_fps=30)

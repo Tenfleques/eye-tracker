@@ -113,14 +113,12 @@ struct Record {
         origin_valid = gaze_origin->left_validity == TOBII_VALIDITY_VALID
             && gaze_origin->right_validity == TOBII_VALIDITY_VALID;
         origin_timestamp_us = gaze_origin->timestamp_us;
-        sys_clock = timeInMilliseconds();
     }
     void setPos(tobii_eye_position_normalized_t const* eye_pos) {
         pos = Eye(eye_pos->left_xyz, eye_pos->right_xyz);
         pos_valid = eye_pos->left_validity == TOBII_VALIDITY_VALID
             && eye_pos->right_validity == TOBII_VALIDITY_VALID;
         pos_timestamp_us = eye_pos->timestamp_us;
-        sys_clock = timeInMilliseconds();
     }
     void print() {
         gaze.print();
