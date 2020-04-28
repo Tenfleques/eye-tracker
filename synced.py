@@ -70,6 +70,8 @@ class Synced:
 
     # fast appends, 0(1)
     FRAMES = deque()
+    stop_tobii_thread = None
+    track_gaze_real = False
 
     def __init__(self, video_path, save_dir="sample",
                  dll_path="TobiiEyeLib/x64/Debug/TobiiEyeLib.dll",
@@ -159,7 +161,8 @@ class Synced:
             "max": mx
         }
 
-    def start(self, video_fps=None, replay=False):
+    def start(self, video_fps=None, show_realtime_tracker=False, replay=False):
+        self.track_gaze_real = show_realtime_tracker
         if not os.path.isfile(self.video_path):
             print("the video file not found")
             return
@@ -203,14 +206,25 @@ class Synced:
 
     def stop(self, replay=False):
         if not replay:
-            self.tobii_lib.stop()
+            if self.stop_tobii_thread is not None:
+                if self.stop_tobii_thread.is_alive():
+                    self.stop_tobii_thread.join()
+
+            self.stop_tobii_thread = threading.Thread(target=self.tobii_lib.stop)
+            self.stop_tobii_thread.start()
+
             filename = os.path.join(self.save_dir, "results.json")
             with open(filename, "w") as f:
                 f.write(json.dumps(list(self.FRAMES)))
                 f.close()
         cv2.destroyAllWindows()
 
-    def record_processor(self, frame_id):
+    def __del__(self):
+        if self.stop_tobii_thread is not None:
+            if self.stop_tobii_thread.is_alive():
+                self.stop_tobii_thread.join()
+
+    def record_processor(self, frame_id, frame):
         gaze = self.tobii_lib.get_latest(frame_id)[0]
         if gaze.sys_clock:
             self.FRAMES.append({
@@ -218,6 +232,23 @@ class Synced:
                 "time": time.time(),
                 "tracker": gaze.to_dict()
             })
+
+        if self.track_gaze_real:
+            x, y, w, h = cv2.getWindowImageRect(self.video_name)
+            self.bg_frame[:, :x, :] = self.bg_color
+            self.bg_frame[x:w, y:h, :] = cv2.resize(frame, dsize=(h, w), interpolation=cv2.INTER_CUBIC)
+            xyv = gaze["gaze"]
+            color = (20, 20, 100)
+            x1 = int(self.SCREEN_SIZE[0] * xyv["x"]) - 10
+            y1 = int(self.SCREEN_SIZE[1] * xyv["y"]) - 10
+            cv2.circle(self.bg_frame, (x1, y1), 20, color, thickness=2, lineType=8, shift=0)
+            # horizontal
+            cv2.line(self.bg_frame, (x1 - 10, y1), (x1 + 10, y1), color, thickness=1.5, lineType=8, shift=0)
+            # vertical
+            cv2.line(self.bg_frame, (x1, y1 - 10), (x1, y1 + 10), color, thickness=1.5, lineType=8, shift=0)
+            cv2.imshow(self.video_name, self.bg_frame)
+        else:
+            cv2.imshow(self.video_name, frame)
         return
 
     def replay_processor(self, frame_id, frame):
@@ -258,9 +289,16 @@ class Synced:
                 if True:  # 0.0 < xyv["x"] < 1.0 and 0.0 < xyv["y"] < 1.0:
                     x1 = int(self.SCREEN_SIZE[0] * xyv["x"]) - 10
                     y1 = int(self.SCREEN_SIZE[1] * xyv["y"]) - 10
-                    box_w = 20
-                    box_h = 20
-                    cv2.rectangle(self.bg_frame, (x1, y1), (x1 + box_w, y1 + box_h), color[2], -1)
+                    # box_w = 20
+                    # box_h = 20
+                    cv2.circle(self.bg_frame, (x1, y1), 20, color[2], thickness=2, lineType=8, shift=0)
+                    # cv2.rectangle(self.bg_frame, (x1, y1), (x1 + box_w, y1 + box_h), color[2], -1)
+                    # horizontal
+                    cv2.line(self.bg_frame, (max(x1 - 10, 0), y1), (x1 + 10, y1),
+                             color[1], thickness=1.5, lineType=8, shift=0)
+                    # vertical
+                    cv2.line(self.bg_frame, (x1, max(y1 - 10, 0)), (x1, y1 + 10),
+                             color[1], thickness=1.5, lineType=8, shift=0)
 
         else:
             details = "no gaze data for the frame: {}".format(frame_id)
@@ -321,6 +359,7 @@ class Synced:
 
         st = time.time()
         while cap.isOpened():
+
             if should_stop():
                 break
             ret, frame = cap.read()
@@ -330,8 +369,7 @@ class Synced:
                 break
             # get tobii position only if in recording mode
             if not replay:
-                cb(frame_id)
-                cv2.imshow(self.video_name, frame)
+                cb(frame_id, frame)
             else:
                 cb(frame_id, frame)
 
@@ -351,7 +389,8 @@ class Synced:
 
 
 if __name__ == "__main__":
-    synced = Synced("./data/stimulus_sample.mp4")
-    synced.start(video_fps=1000)
-    #print("start replay")
-    #synced.replay(video_fps=30)
+    synced = Synced("./data/stimulus_sample.mp4",
+                    dll_path="TobiiEyeLib/x64/Release/TobiiEyeLib.dll",)
+    synced.start(video_fps=1000, show_realtime_tracker=False)
+    # print("start replay")
+    # synced.replay(video_fps=30)

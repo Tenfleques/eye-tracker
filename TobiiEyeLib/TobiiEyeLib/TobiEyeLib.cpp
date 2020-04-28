@@ -155,6 +155,10 @@ cv::VideoCapture cap;
 std::string user_images_path;
 std::deque<cv::Mat> Frames;
 std::deque<cv::Mat> all_frames(3);
+int frame_width = 0;
+int frame_height = 0;
+cv::VideoWriter video;  
+
 
 void save_to_file(int frame_id) {
     // save current image frame as image-{frame_id}.png
@@ -219,8 +223,13 @@ int start(int cam_index, char* images_path) {
     user_images_path = images_path;
     if(!cap.open(cam_index)){
         printf("Error: Camera error \n");
-        //return 0;
+        return 0;
     }
+    frame_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+    frame_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+    video = cv::VideoWriter(user_images_path + "/avi-video.avi", cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, cv::Size(frame_width, frame_height), true);
+
+
     if (assert_tobii_error(result))
         return -1;
 
@@ -298,6 +307,7 @@ int stop() {
 Record* get_latest(int f_id) {   
     if (!all_frames.empty()) {
         Frames.push_back(all_frames.back());
+        video.write(all_frames.back());
     }    
     return &tmp_record;
 }
