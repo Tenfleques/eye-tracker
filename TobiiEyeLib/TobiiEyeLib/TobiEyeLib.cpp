@@ -221,12 +221,12 @@ int start(int cam_index, char* images_path) {
     user_images_path = images_path;
     if(!cap.open(cam_index)){
         printf("Error: Camera error \n");
-        return 0;
     }
-    frame_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
-    frame_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
-    video = cv::VideoWriter(user_images_path + "/avi-video.avi", cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, cv::Size(frame_width, frame_height), true);
-
+    else {
+        frame_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+        frame_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+        video = cv::VideoWriter(user_images_path + "/avi-video.avi", cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, cv::Size(frame_width, frame_height), true);
+    }
 
     if (assert_tobii_error(result))
         return -1;

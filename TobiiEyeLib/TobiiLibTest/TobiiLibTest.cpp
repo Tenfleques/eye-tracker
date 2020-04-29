@@ -107,7 +107,7 @@ void playVideo() {
     while (1) {
         cv::Mat img;
         cam >> img;
-        Record* tmp_record = get_latest();
+        Record* tmp_record = get_latest(0);
         if (tmp_record->gaze_valid)
             tmp_record->print();
 
@@ -118,9 +118,9 @@ void playVideo() {
     cv::destroyWindow("test");
 }
 int main() {
-    //const char* dir = std::string("sample/images").c_str();
-    //cout << start(0, dir);
-    //playVideo();
-    //stop();
+    char * dir = _strdup("sample/images");
+    cout << start(0, dir);
+    playVideo();
+    stop();
 }
 
