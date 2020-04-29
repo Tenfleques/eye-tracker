@@ -133,4 +133,6 @@ sample*
 .vscode
 .vs
 results
-*.dll
+TobiiEyeLib/Debug/opencv_world430.dll
+TobiiEyeLib/Debug/interaction_lib.dll
+*d.dll
