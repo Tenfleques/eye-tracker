@@ -136,3 +136,5 @@ results
 TobiiEyeLib/Debug/opencv_world430.dll
 TobiiEyeLib/Debug/interaction_lib.dll
 *d.dll
+.idea 
+*d.dll 

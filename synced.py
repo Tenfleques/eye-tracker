@@ -377,11 +377,11 @@ class Synced:
         """
         :return: Boolean
         """
-        gaze = self.tobii_lib.get_latest(0)[0]
+        # gaze = self.tobii_lib.get_latest(0)[0]
 
-        if not gaze.sys_clock:
-            print("tobii device not ready")
-            return False
+        # if not gaze.sys_clock:
+        #    print("tobii device not ready")
+        #    return False
 
         if not self.vid_cap.isOpened():
             print("video not ready")

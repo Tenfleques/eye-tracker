@@ -6,7 +6,6 @@
 #include <thread>
 #include <chrono>
 #include "TobiEyeLib.h"
-#include <windows.h>
 #include "opencv2/opencv.hpp"
 #include <string>
 #include <deque>
@@ -14,10 +13,7 @@
 using namespace cv;
 
 double timeInMilliseconds() {
-    SYSTEMTIME tim;
-    GetSystemTime(&tim);
-    double time_ms = time(0) + tim.wMilliseconds/1000.0;
-    return time_ms;
+    return 0.0;
 }
 
 struct Point2D {
@@ -181,6 +177,7 @@ void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_dat
 }
 void gaze_origin_callback(tobii_gaze_origin_t const* gaze_origin, void* user_data) {
     tmp_record.setOrigin(gaze_origin);
+    //tmp_record.print();
 }
 void eye_position_callback(tobii_eye_position_normalized_t const* eye_pos, void* user_data) {
     tmp_record.setPos(eye_pos);
