@@ -6,16 +6,15 @@
 #define TOBIEYELIB_API __declspec(dllimport)
 #endif
 
-struct Record;
 
-extern "C" TOBIEYELIB_API int stop();
+struct SessionRecord;
 
-//extern "C" TOBIEYELIB_API int start(int cam_index =  0);
 
-extern "C" TOBIEYELIB_API int start(int cam_index, char* images_path);
+extern "C" TOBIEYELIB_API long save_images(const char* out_path = nullptr);
 
-//extern "C" TOBIEYELIB_API Record* get_latest();
+extern "C" TOBIEYELIB_API int run(const char* src_path = nullptr,
+    const char* out_path = nullptr);
 
-extern "C" TOBIEYELIB_API Record * get_latest(int frame_id);
+extern "C" TOBIEYELIB_API const char* get_json();
 
-extern "C" TOBIEYELIB_API Record * get_records(int frame_id);
+extern "C" TOBIEYELIB_API SessionRecord* get_session();

@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <limits.h>
-#include "TobiEyeLib.h"
 
 #include <iostream>
 #include <opencv2/highgui.hpp>
@@ -11,6 +10,7 @@
 #include <thread>
 #include <deque>
 #include <utility>
+#include <fstream>
 
 
 double timeInSeconds() {
@@ -21,7 +21,7 @@ double timeInSeconds() {
 
 std::string process_inject(std::string inject) {
     if (!inject.empty()) {
-        if (!inject[0] == ',') {
+        if (!inject.front() == ',') {
             inject = "," + inject;
         }
     }
@@ -46,7 +46,7 @@ struct Point2D {
     virtual std::string to_string(const std::string& inject) {
         std::stringstream ss;
         ss << "{\"x\": " << std::fixed << x
-        << ",\"y\": " << std::fixed << y << process_inject(inject) << "}";
+            << ",\"y\": " << std::fixed << y << process_inject(inject) << "}";
         return ss.str();
     }
     float x = .0, y = .0;
@@ -73,7 +73,7 @@ struct Gaze : Point2D {
     std::string to_json() {
         std::stringstream ss;
         ss << "\"valid\": " << valid << ",\"timestamp_us\": " << timestamp_us
-           << ",\"timestamp\": " << std::fixed << timestamp;
+            << ",\"timestamp\": " << std::fixed << timestamp;
         return to_string(ss.str());
     }
 };
@@ -103,7 +103,7 @@ struct Point3D : Point2D {
     std::string to_string(const std::string& inject) override {
         std::stringstream ss;
         ss << "{\"x\": " << std::fixed << x << ", \"y\": "
-        << std::fixed << y << ", \"z\": " << z << process_inject(inject) << "}";
+            << std::fixed << y << ", \"z\": " << z << process_inject(inject) << "}";
         return ss.str();
     }
     float z;
@@ -140,6 +140,7 @@ struct Pos3D : Eyes {
         std::stringstream sv_l;
         std::stringstream sv_r;
         sv_l << "\"valid\": " << v_l;
+
         sv_r << "\"valid\": " << v_r;
 
         ss << "{\"timestamp\": " << std::fixed << timestamp
@@ -162,15 +163,17 @@ struct Frame {
         timestamp = timeInSeconds();
     }
 
-    void save_to_file(const std::string user_images_path) {
+    bool save_to_file(const std::string user_images_path) {
         // save current image frame as image-{frame_id}.png
         if (!user_images_path.empty()) {
             std::string filename = user_images_path + "\\frame-" + std::to_string(id) + ".png";
             if (!frame.empty()) {
-                cv::imwrite(filename, frame);
+                return cv::imwrite(filename, frame);
             }
         }
+        return false;
     }
+
 
     [[nodiscard]] std::string to_json() const {
         std::stringstream ss;
@@ -187,10 +190,17 @@ struct SessionRecord {
     std::deque<Pos3D> origins;
     bool stop_updates = false;
     bool record_tracker = false;
-    std::stringstream meta_collector;
 
-    void update(Gaze& g) {
-        if (!is_recording_tracker())
+    ~SessionRecord() {
+        camera_frames.~deque();
+        video_frames.~deque();
+        gazes.~deque();
+        poses.~deque();
+        origins.~deque();
+
+    }
+    void update(Gaze g) {
+        if (!this->is_recording_tracker())
             return;
         gazes.push_back(g);
     }
@@ -202,32 +212,32 @@ struct SessionRecord {
             video_frames.push_back(f);
         }
     }
-    void update(const char* path = nullptr) {
-        cv::VideoCapture cap;
+    int update(const char* path = nullptr) {
         if (path != nullptr) {
-            cap = cv::VideoCapture(path);
+            cv::VideoCapture cap(path);
             if (!cap.isOpened()) {
                 std::cerr << "[ERROR] failed to open video " << path << std::endl;
-                return;
+                return -1;
             }
+            long counter = 0;
+            std::cout << "[INFO] preparing video ... " << std::endl;
+            while (cap.isOpened()) {
+                cv::Mat img;
+                cap >> img;
+                if (img.empty()) {
+                    break;
+                }
+                this->update(Frame(img, counter));
+                counter++;
+            }
+            std::cout << "[INFO] prepared " << counter << " frames " << " done." << std::endl;
+            cap.release();
         }
 
-        long counter = 0;
-        std::cout << "[INFO] preparing video ... " << std::endl;
-        while (cap.isOpened()) {
-            cv::Mat img;
-            cap >> img;
-            if (img.empty()) {
-                break;
-            }
-            this->update(Frame(img, counter));
-            counter++;
-        }
-        std::cout << "[INFO] prepared " << counter << " frames " << " done." << std::endl;
-        cap.release();
+        return 0;
     }
-    void update(Pos3D& pg, bool is_pos = true) {
-        if (!is_recording_tracker())
+    void update(Pos3D pg, bool is_pos = true) {
+        if (!this->is_recording_tracker())
             return;
 
         if (is_pos) {
@@ -242,10 +252,13 @@ struct SessionRecord {
             video_frames[index].update_timestamp();
         }
     }
-    void save_images(const std::string user_images_path){
-        for (auto f : camera_frames {{
-            f.save_to_file(user_images_path);
+    long save_images(const std::string user_images_path) {
+        long save_count = 0;
+        for (auto f : camera_frames) {
+            int saved = (int)f.save_to_file(user_images_path);
+            save_count += saved;
         }
+        return save_count - camera_frames.size();
     }
     cv::Mat getFrameAt(long index) {
         if (video_frames.size() > index) {
@@ -301,14 +314,12 @@ struct SessionRecord {
         std::string gaze_frames = g_json(gazes);
 
         std::string json;
-        json += "{\"frames\": " + v_frames;
-        json += ",\"camera\": " + c_frames;
-
-        json += ",\"pos\": " + pos_frames;
-        json += ",\"origin\": " + origin_frames;
-        json += ",\"gaze\": " + gaze_frames;
-
-        json += "}";
+        json += "{\"frames\": [" + v_frames;
+        json += "],\"camera\": [" + c_frames;
+        json += "],\"pos\": [" + pos_frames;
+        json += "],\"origin\" [: " + origin_frames;
+        json += "],\"gaze\": [" + gaze_frames;
+        json += "]}";
         return json;
     }
     [[nodiscard]] bool break_out_updates() const {
@@ -322,50 +333,55 @@ struct SessionRecord {
 // the tobii-tracker callbacks
 void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_data */) {
     // update gaze
-    sessionRecord.update( Gaze(gaze_point->position_xy,
-            gaze_point->validity == TOBII_VALIDITY_VALID,
-            gaze_point->timestamp_us) );
+    sessionRecord.update(Gaze(gaze_point->position_xy,
+        gaze_point->validity == TOBII_VALIDITY_VALID,
+        gaze_point->timestamp_us));
 }
 void gaze_origin_callback(tobii_gaze_origin_t const* gaze_origin, void* user_data) {
-    bool valid[2] = {gaze_origin->left_validity == TOBII_VALIDITY_VALID,
-                     gaze_origin->right_validity == TOBII_VALIDITY_VALID};
+    bool valid[2] = { gaze_origin->left_validity == TOBII_VALIDITY_VALID,
+                     gaze_origin->right_validity == TOBII_VALIDITY_VALID };
 
     sessionRecord.update(Pos3D(gaze_origin->left_xyz,
-                                gaze_origin->right_xyz,
-                                valid, gaze_origin->timestamp_us), false );
+        gaze_origin->right_xyz,
+        valid, gaze_origin->timestamp_us), false);
 }
 void eye_position_callback(tobii_eye_position_normalized_t const* eye_pos, void* user_data) {
-    bool valid[2] = {eye_pos->left_validity == TOBII_VALIDITY_VALID,
-                     eye_pos->right_validity == TOBII_VALIDITY_VALID};
+    bool valid[2] = { eye_pos->left_validity == TOBII_VALIDITY_VALID,
+                     eye_pos->right_validity == TOBII_VALIDITY_VALID };
 
     sessionRecord.update(Pos3D(eye_pos->left_xyz,
-                               eye_pos->right_xyz,
-                               valid, eye_pos->timestamp_us), true );
+        eye_pos->right_xyz,
+        valid, eye_pos->timestamp_us), true);
 }
 
-bool assert_tobii_error(const tobii_error_t result, const char* msg = "error"){
+bool assert_tobii_error(const tobii_error_t result, const char* msg = "error") {
     if (result != TOBII_ERROR_NO_ERROR) {
-        std::cerr << "[ERROR] " << tobii_error_message(result) << " " msg;
+        std::cerr << "[ERROR] " << tobii_error_message(result) << " " << msg;
         return true;
     }
     return false;
 }
 
-void url_receiver(char const* url, void* user_data){
+void url_receiver(char const* url, void* user_data) {
     char* buffer = (char*)user_data;
     if (*buffer != '\0') return; // only keep first value
 
+    std::string ur_s = url;
+    const char* ur_ss = ur_s.c_str();
+
     if (strlen(url) < 256)
-        strcpy(buffer, url);
+        strcpy(buffer, ur_ss);
 }
 
-struct tobiiCtrl{
+struct tobiiCtrl {
     // Create API
     tobii_api_t* api = NULL;
     // Connect to the first tracker found
     tobii_device_t* device = NULL;
     // status flag
     tobii_error_t result = tobii_api_create(&api, NULL, NULL);
+    // updates thread 
+
     void updateRecords() {
         while (!sessionRecord.break_out_updates()) {
             // Optionally block this thread until data is available. Especially useful if running in a separate thread.
@@ -388,7 +404,7 @@ struct tobiiCtrl{
         if (assert_tobii_error(result))
             return -1;
 
-        if (*url == '\0'){
+        if (*url == '\0') {
             std::cerr << "[ERROR] No device found\n";
             return -1;
         }
@@ -406,13 +422,7 @@ struct tobiiCtrl{
         if (assert_tobii_error(result, "subscription"))
             return -1;
 
-        if (!updating) {
-            updating = true;
-            update_thread = std::thread(updateRecords);
-        }
-        update_thread.joinable();
-
-        return 1;
+        return 0;
     }
 
     int stop() {
@@ -435,19 +445,47 @@ struct tobiiCtrl{
     }
 }tobiiCtrl;
 
-
+void tobii_thread() {
+    tobiiCtrl.updateRecords();
+}
 void start(const char* path = nullptr, int delay = -1, const char* out_path = nullptr) {
     cv::VideoCapture cap;
     std::string win_name = "cam feed";
     std::string user_images_path;
+    cv::VideoWriter video;
+    std::thread update_thread;
 
     if (path != nullptr) {
-        sessionRecord.update(path);
-        cv::namedWindow(win_name);
+        int video_ready = sessionRecord.update(path);
+        win_name = path;
         // start recording from the tracker
-        sessionRecord.record_tracker = true;
-        std::cout << "[INFO] tracker device initialised and returns status code : "
-                << tobiiCtrl.start() << std::endl;
+        if (video_ready == 0) {
+            cv::namedWindow(win_name);
+            sessionRecord.record_tracker = true;
+            int tobii_started = tobiiCtrl.start();
+            if (tobii_started == 0) {
+                update_thread = std::thread(tobii_thread);
+                std::cout << "[INFO] tracker device initialised and returns status code : "
+                    << tobii_started << std::endl;
+            }
+            else {
+                std::cout << "[ERROR] tracker device failed to initialise and returns status code : "
+                    << tobii_started << std::endl;
+                sessionRecord.record_tracker = false;
+                sessionRecord.stop_updates = true;
+                cap.release();
+                video.release();
+                return;
+            }
+        }
+        else {
+            sessionRecord.record_tracker = false;
+            sessionRecord.stop_updates = true;
+            cap.release();
+            video.release();
+            return;
+        }
+
 
         if (delay == -1) {
             // need to get the video fps
@@ -455,7 +493,7 @@ void start(const char* path = nullptr, int delay = -1, const char* out_path = nu
             double fps = cap.get(cv::CAP_PROP_FPS);
             delay = (int)(1000 / fps);
             std::cout << "[INFO] using the fps of " << fps << " delaying for next frame by "
-                      << delay << " milliseconds " << std::endl;
+                << delay << " milliseconds " << std::endl;
         }
     }
     else {
@@ -468,13 +506,13 @@ void start(const char* path = nullptr, int delay = -1, const char* out_path = nu
             delay = 1;
         }
         // setup video writer
-        if(out_path != nullptr){
+        if (out_path != nullptr) {
             user_images_path = std::string(out_path);
             const int frame_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
             const int frame_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
-            const cv::VideoWriter video = cv::VideoWriter(user_images_path + "/avi-video.avi",
-                                                          cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10,
-                                                          cv::Size(frame_width, frame_height), true);
+            video = cv::VideoWriter(user_images_path + "/avi-video.avi",
+                cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10,
+                cv::Size(frame_width, frame_height), true);
         }
     }
 
@@ -497,7 +535,7 @@ void start(const char* path = nullptr, int delay = -1, const char* out_path = nu
         else {
             // video source is camera
             cap >> img;
-            sessionRecord.update(Frame(img, counter), true);
+            //sessionRecord.update(Frame(img, counter), true);
             video.write(img);
         }
         counter += 1;
@@ -508,21 +546,44 @@ void start(const char* path = nullptr, int delay = -1, const char* out_path = nu
         sessionRecord.record_tracker = false;
         sessionRecord.stop_updates = true;
         cv::destroyWindow(win_name);
-        if (!user_images_path.empty()){
-            sessionRecord.save_images();
+
+        if (update_thread.joinable()) {
+            update_thread.join();
         }
     }
-        std::cout << "[INFO] after " << time_diff << " seconds, factual video fps: "
-                        << (double)counter / (time_diff) << std::endl;
-        std::cout << "[INFO] tracker device stopped and returned code: " << tobiiCtrl.stop() << std::endl;
-    }
+    std::cout << "[INFO] after " << time_diff << " seconds, factual video fps: "
+        << (double)counter / (time_diff) << std::endl;
+    std::cout << "[INFO] tracker device stopped and returned code: " << tobiiCtrl.stop() << std::endl;
     cap.release();
+    video.release();
 }
 
-std::string get_json_records(){
-    return sessionRecord.to_json();
+// exports 
+
+const char* get_json() {
+    const char* res = sessionRecord.to_json().c_str();
+    return res;
 }
 
-SessionRecord* get_records() {
+SessionRecord* get_session() {
     return &sessionRecord;
+}
+
+long save_images(const char* out_path = nullptr) {
+    if (out_path == nullptr) {
+        return -1;
+    }
+    std::string user_images_path = std::string(out_path);
+
+    if (!user_images_path.empty()) {
+        return sessionRecord.save_images(user_images_path);
+    }
+    return -1;
+}
+
+int run(const char* src_path = nullptr, const char* out_path = nullptr) {
+    std::thread cam_thread(start, nullptr, 1, nullptr);
+    start(src_path, -1, out_path);
+    cam_thread.join();
+    return 0;
 }
