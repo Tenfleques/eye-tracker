@@ -3,17 +3,29 @@
 #include <stdio.h>
 #include <assert.h>
 #include <limits.h>
-#include <thread>
-#include <chrono>
 #include "TobiEyeLib.h"
-#include "opencv2/opencv.hpp"
-#include <string>
+
+#include <iostream>
+#include <opencv2/highgui.hpp>
+#include <chrono>
+#include <thread>
 #include <deque>
+#include <utility>
 
-using namespace cv;
 
-double timeInMilliseconds() {
-    return 0.0;
+double timeInSeconds() {
+    auto current_time = std::chrono::system_clock::now();
+    auto duration_in_seconds = std::chrono::duration<double>(current_time.time_since_epoch());
+    return duration_in_seconds.count();
+}
+
+std::string process_inject(std::string inject) {
+    if (!inject.empty()) {
+        if (!inject[0] == ',') {
+            inject = "," + inject;
+        }
+    }
+    return inject;
 }
 
 struct Point2D {
@@ -26,18 +38,53 @@ struct Point2D {
     void setY(const float yy) {
         y = yy;
     }
-    void print() {
-        printf("x %f, y %f \n", x, y);
+    void setXY(const float xx, const float yy) {
+        y = yy;
+        x = xx;
+    }
+
+    virtual std::string to_string(const std::string& inject) {
+        std::stringstream ss;
+        ss << "{\"x\": " << std::fixed << x
+        << ",\"y\": " << std::fixed << y << process_inject(inject) << "}";
+        return ss.str();
     }
     float x = .0, y = .0;
 };
+
+struct Gaze : Point2D {
+    bool valid;
+    double timestamp;
+    int64_t timestamp_us = 0;
+
+    Gaze() : valid(false), timestamp(.0) {};
+    Gaze(const float l[2], bool v, int64_t t) {
+        valid = v;
+        timestamp = timeInSeconds();
+        timestamp_us = t;
+        this->setXY(l[0], l[1]);
+    }
+    Gaze(const float l, const float r, bool v, int64_t t) {
+        valid = v;
+        timestamp = timeInSeconds();
+        timestamp_us = t;
+        this->setXY(l, r);
+    }
+    std::string to_json() {
+        std::stringstream ss;
+        ss << "\"valid\": " << valid << ",\"timestamp_us\": " << timestamp_us
+           << ",\"timestamp\": " << std::fixed << timestamp;
+        return to_string(ss.str());
+    }
+};
+
 struct Point3D : Point2D {
     Point3D(const float x, const float y, const float zz) {
         z = zz;
         this->setX(x);
         this->setY(y);
     };
-    Point3D(const float l[3]) {
+    explicit Point3D(const float l[3]) {
         this->setX(l[0]);
         this->setY(l[1]);
         z = l[2];
@@ -48,139 +95,260 @@ struct Point3D : Point2D {
     void setZ(const float zz) {
         z = zz;
     }
-    void print() {
-        printf("x %f, y %f, z %f \n", x, y, z);
+    void setXYZ(const float xx, const float yy, const float zz) {
+        y = yy;
+        x = xx;
+        z = zz;
+    }
+    std::string to_string(const std::string& inject) override {
+        std::stringstream ss;
+        ss << "{\"x\": " << std::fixed << x << ", \"y\": "
+        << std::fixed << y << ", \"z\": " << z << process_inject(inject) << "}";
+        return ss.str();
     }
     float z;
 };
-struct Eye {
-    Eye(Point3D l, Point3D r) : left(l), right(r) {};
-    Eye(const float l[3], const float r[3]) : left(Point3D(l)), right(Point3D(r)) {};
-    Eye() : left(Point3D()), right(Point3D()) {};
+struct Eyes {
+    Eyes(Point3D l, Point3D r) : left(std::move(l)), right(std::move(r)) {};
+    Eyes(const float l[3], const float r[3]) : left(Point3D(l)), right(Point3D(r)) {};
+    Eyes() : left(Point3D()), right(Point3D()) {};
 
-    void setLeft(Point3D l) {
-        left = l;
+    void setLeft(Point3D l, bool v) {
+        left = std::move(l);
+        v_l = v;
     }
-    void setRight(Point3D r) {
-        right = r;
-    }
-    void print() {
-        left.print();
-        right.print();
+    void setRight(Point3D r, bool v) {
+        right = std::move(r);
+        v_r = v;
     }
     Point3D left, right;
+    bool v_l = false, v_r = false;
+};
+struct Pos3D : Eyes {
+    double timestamp;
+    int64_t timestamp_us = 0;
+
+    Pos3D() : timestamp(.0) {};
+    Pos3D(const float l[3], const float r[3], const bool v[2], const int64_t t) {
+        timestamp = timeInSeconds();
+        timestamp_us = t;
+        this->setLeft(Point3D(l), v[0]);
+        this->setRight(Point3D(r), v[1]);
+    }
+    std::string to_json() {
+        std::stringstream ss;
+        std::stringstream sv_l;
+        std::stringstream sv_r;
+        sv_l << "\"valid\": " << v_l;
+        sv_r << "\"valid\": " << v_r;
+
+        ss << "{\"timestamp\": " << std::fixed << timestamp
+            << ",\"timestamp_us\": " << timestamp_us
+            << ",\"left\": " << left.to_string(sv_l.str())
+            << ",\"right\": " << right.to_string(sv_r.str()) << "}";
+        return ss.str();
+    }
+};
+struct Frame {
+    long id;
+    double timestamp;
+    cv::Mat frame;
+    Frame(cv::Mat  f, long i) : frame(std::move(f)), id(i), timestamp(timeInSeconds()) {};
+    Frame() :id(0), timestamp(timeInSeconds()) {};
+    explicit Frame(long i) :id(i), timestamp(timeInSeconds()) {};
+    Frame(long i, double t) :id(i), timestamp(t) {};
+
+    void update_timestamp() {
+        timestamp = timeInSeconds();
+    }
+
+    void save_to_file(const std::string user_images_path) {
+        // save current image frame as image-{frame_id}.png
+        if (!user_images_path.empty()) {
+            std::string filename = user_images_path + "\\frame-" + std::to_string(id) + ".png";
+            if (!frame.empty()) {
+                cv::imwrite(filename, frame);
+            }
+        }
+    }
+
+    [[nodiscard]] std::string to_json() const {
+        std::stringstream ss;
+        ss << "{\"id\": " << std::fixed << id << "\"timestamp\": " << std::fixed << timestamp << "}";
+        return ss.str();
+    }
 };
 
-struct Record {
-    Record() : gaze(Point2D()),
-        origin(Eye()), pos(Eye()),
-        gaze_timestamp_us(0), origin_timestamp_us(0), pos_timestamp_us(0),
-        sys_clock(timeInMilliseconds()),
-        gaze_valid(false), pos_valid(false), origin_valid(false)
-    {};
+struct SessionRecord {
+    std::deque<Frame> camera_frames;
+    std::deque<Frame> video_frames;
+    std::deque<Gaze> gazes;
+    std::deque<Pos3D> poses;
+    std::deque<Pos3D> origins;
+    bool stop_updates = false;
+    bool record_tracker = false;
+    std::stringstream meta_collector;
 
-    Record(tobii_gaze_point_t const* gaze_point,
-        tobii_gaze_origin_t const* gaze_origin,
-        tobii_eye_position_normalized_t const* eye_pos) :
-
-        gaze(Point2D(gaze_point->position_xy)),
-        origin(Eye(gaze_origin->left_xyz, gaze_origin->right_xyz)),
-        pos(Eye(eye_pos->left_xyz, eye_pos->right_xyz)),
-        gaze_timestamp_us(gaze_point->timestamp_us),
-        origin_timestamp_us(gaze_origin->timestamp_us),
-        pos_timestamp_us(eye_pos->timestamp_us),
-        sys_clock(timeInMilliseconds()),
-        gaze_valid(gaze_point->validity == TOBII_VALIDITY_VALID),
-        pos_valid(eye_pos->left_validity == TOBII_VALIDITY_VALID
-            && eye_pos->right_validity == TOBII_VALIDITY_VALID),
-        origin_valid(gaze_origin->left_validity == TOBII_VALIDITY_VALID
-            && gaze_origin->right_validity == TOBII_VALIDITY_VALID)
-    {};
-
-
-    void setGaze(tobii_gaze_point_t const* gaze_point) {
-        gaze = Point2D(gaze_point->position_xy);
-        gaze_valid = gaze_point->validity == TOBII_VALIDITY_VALID;
-        gaze_timestamp_us = gaze_point->timestamp_us;
-        sys_clock = timeInMilliseconds();
+    void update(Gaze& g) {
+        if (!is_recording_tracker())
+            return;
+        gazes.push_back(g);
     }
-    void setOrigin(tobii_gaze_origin_t const* gaze_origin) {
-        origin = Eye(gaze_origin->left_xyz, gaze_origin->right_xyz);
-        origin_valid = gaze_origin->left_validity == TOBII_VALIDITY_VALID
-            && gaze_origin->right_validity == TOBII_VALIDITY_VALID;
-        origin_timestamp_us = gaze_origin->timestamp_us;
+    void update(const Frame& f, bool is_cam_frame = false) {
+        if (is_cam_frame) {
+            camera_frames.push_back(f);
+        }
+        else {
+            video_frames.push_back(f);
+        }
     }
-    void setPos(tobii_eye_position_normalized_t const* eye_pos) {
-        pos = Eye(eye_pos->left_xyz, eye_pos->right_xyz);
-        pos_valid = eye_pos->left_validity == TOBII_VALIDITY_VALID
-            && eye_pos->right_validity == TOBII_VALIDITY_VALID;
-        pos_timestamp_us = eye_pos->timestamp_us;
-    }
-    void print() {
-        gaze.print();
-        origin.print();
-        pos.print();
-        printf("time %Ii %Ii %Ii \n\n", gaze_timestamp_us, origin_timestamp_us, pos_timestamp_us);
-    }
-    Point2D gaze;
-    Eye origin, pos;
-    int64_t gaze_timestamp_us = 0,
-        origin_timestamp_us = 0,
-        pos_timestamp_us = 0;
-    double sys_clock = timeInMilliseconds(), selfie_time = timeInMilliseconds();
-    bool gaze_valid = false, pos_valid = false, origin_valid = false;
-    
-    Point3D img_shape;
-};
+    void update(const char* path = nullptr) {
+        cv::VideoCapture cap;
+        if (path != nullptr) {
+            cap = cv::VideoCapture(path);
+            if (!cap.isOpened()) {
+                std::cerr << "[ERROR] failed to open video " << path << std::endl;
+                return;
+            }
+        }
 
-std::thread update_thread;
-bool updating = false;
-// Create API
-tobii_api_t* api = NULL;
-// Connect to the first tracker found
-tobii_device_t* device = NULL;
-// status flag
-tobii_error_t result = tobii_api_create(&api, NULL, NULL);
-// the temporary record to update in the callbacks
-Record tmp_record;
-// camera object
-cv::VideoCapture cap;
-// images directory 
-std::string user_images_path;
-std::deque<cv::Mat> Frames;
-std::deque<cv::Mat> all_frames(3);
-int frame_width = 0;
-int frame_height = 0;
-cv::VideoWriter video;  
-
-
-void save_to_file(int frame_id) {
-    // save current image frame as image-{frame_id}.png
-    if (!user_images_path.empty()) {
-        std::string filename = user_images_path + "\\frame-" + std::to_string(frame_id) + ".png";
-        if (!Frames[frame_id].empty()) {
-            cv::imwrite(filename, Frames[frame_id]);
-        }        
+        long counter = 0;
+        std::cout << "[INFO] preparing video ... " << std::endl;
+        while (cap.isOpened()) {
+            cv::Mat img;
+            cap >> img;
+            if (img.empty()) {
+                break;
+            }
+            this->update(Frame(img, counter));
+            counter++;
+        }
+        std::cout << "[INFO] prepared " << counter << " frames " << " done." << std::endl;
+        cap.release();
     }
-    
-}
-// the tobii callbacks
+    void update(Pos3D& pg, bool is_pos = true) {
+        if (!is_recording_tracker())
+            return;
+
+        if (is_pos) {
+            poses.push_back(pg);
+        }
+        else {
+            origins.push_back(pg);
+        }
+    }
+    void update(long index) {
+        if (video_frames.size() > index) {
+            video_frames[index].update_timestamp();
+        }
+    }
+    void save_images(const std::string user_images_path){
+        for (auto f : camera_frames {{
+            f.save_to_file(user_images_path);
+        }
+    }
+    cv::Mat getFrameAt(long index) {
+        if (video_frames.size() > index) {
+            return video_frames[index].frame;
+        }
+        cv::Mat img;
+        return img;
+    }
+    static std::string frames_json(const std::deque<Frame>& f) {
+        std::string frames;
+        for (const auto& s : f) {
+            if (frames.empty()) {
+                frames += s.to_json();
+            }
+            else {
+                frames += ", " + s.to_json();
+            }
+        }
+        frames = "{" + frames + "}";
+        return  frames;
+    }
+    static std::string pos3d_json(const std::deque<Pos3D>& f) {
+        std::string frames;
+        for (auto s : f) {
+            if (frames.empty()) {
+                frames += s.to_json();
+            }
+            else {
+                frames += ", " + s.to_json();
+            }
+        }
+        frames = "{" + frames + "}";
+        return  frames;
+    }
+    static std::string g_json(const std::deque<Gaze>& f) {
+        std::string frames;
+        for (auto s : f) {
+            if (frames.empty()) {
+                frames += s.to_json();
+            }
+            else {
+                frames += ", " + s.to_json();
+            }
+        }
+        frames = "{" + frames + "}";
+        return  frames;
+    }
+    [[nodiscard]] std::string to_json() const {
+        std::string v_frames = frames_json(video_frames);
+        std::string c_frames = frames_json(camera_frames);
+        std::string pos_frames = pos3d_json(poses);
+        std::string origin_frames = pos3d_json(origins);
+        std::string gaze_frames = g_json(gazes);
+
+        std::string json;
+        json += "{\"frames\": " + v_frames;
+        json += ",\"camera\": " + c_frames;
+
+        json += ",\"pos\": " + pos_frames;
+        json += ",\"origin\": " + origin_frames;
+        json += ",\"gaze\": " + gaze_frames;
+
+        json += "}";
+        return json;
+    }
+    [[nodiscard]] bool break_out_updates() const {
+        return stop_updates;
+    }
+    [[nodiscard]] bool is_recording_tracker() const {
+        return record_tracker;
+    }
+}sessionRecord;
+
+// the tobii-tracker callbacks
 void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* /* user_data */) {
-    tmp_record.selfie_time = timeInMilliseconds();
-    tmp_record.setGaze(gaze_point);
-    cv::Mat f;
-    if(cap.isOpened()){
-        cap >> f;
-        all_frames.push_back(f);
-    }
-    
+    // update gaze
+    sessionRecord.update( Gaze(gaze_point->position_xy,
+            gaze_point->validity == TOBII_VALIDITY_VALID,
+            gaze_point->timestamp_us) );
 }
 void gaze_origin_callback(tobii_gaze_origin_t const* gaze_origin, void* user_data) {
-    tmp_record.setOrigin(gaze_origin);
-    //tmp_record.print();
+    bool valid[2] = {gaze_origin->left_validity == TOBII_VALIDITY_VALID,
+                     gaze_origin->right_validity == TOBII_VALIDITY_VALID};
+
+    sessionRecord.update(Pos3D(gaze_origin->left_xyz,
+                                gaze_origin->right_xyz,
+                                valid, gaze_origin->timestamp_us), false );
 }
 void eye_position_callback(tobii_eye_position_normalized_t const* eye_pos, void* user_data) {
-    tmp_record.setPos(eye_pos);
+    bool valid[2] = {eye_pos->left_validity == TOBII_VALIDITY_VALID,
+                     eye_pos->right_validity == TOBII_VALIDITY_VALID};
+
+    sessionRecord.update(Pos3D(eye_pos->left_xyz,
+                               eye_pos->right_xyz,
+                               valid, eye_pos->timestamp_us), true );
+}
+
+bool assert_tobii_error(const tobii_error_t result, const char* msg = "error"){
+    if (result != TOBII_ERROR_NO_ERROR) {
+        std::cerr << "[ERROR] " << tobii_error_message(result) << " " msg;
+        return true;
+    }
+    return false;
 }
 
 void url_receiver(char const* url, void* user_data){
@@ -191,122 +359,170 @@ void url_receiver(char const* url, void* user_data){
         strcpy(buffer, url);
 }
 
-void updateRecords() {
-    while (updating) {
-        // Optionally block this thread until data is available. Especially useful if running in a separate thread.
-        result = tobii_wait_for_callbacks(1, &device);
-        assert(result == TOBII_ERROR_NO_ERROR || result == TOBII_ERROR_TIMED_OUT);
+struct tobiiCtrl{
+    // Create API
+    tobii_api_t* api = NULL;
+    // Connect to the first tracker found
+    tobii_device_t* device = NULL;
+    // status flag
+    tobii_error_t result = tobii_api_create(&api, NULL, NULL);
+    void updateRecords() {
+        while (!sessionRecord.break_out_updates()) {
+            // Optionally block this thread until data is available. Especially useful if running in a separate thread.
+            result = tobii_wait_for_callbacks(1, &device);
+            assert(result == TOBII_ERROR_NO_ERROR || result == TOBII_ERROR_TIMED_OUT);
 
-        // Process callbacks on this thread if data is available
-        result = tobii_device_process_callbacks(device);
-        assert(result == TOBII_ERROR_NO_ERROR);
-
-        //latestRecords.push_front(Record(tmp_record));
+            // Process callbacks on this thread if data is available
+            result = tobii_device_process_callbacks(device);
+            assert(result == TOBII_ERROR_NO_ERROR);
+        }
     }
-}
+    int start() {
+        if (assert_tobii_error(result))
+            return -1;
 
-bool assert_tobii_error(tobii_error_t result, const char* msg = "error"){
-    if (result != TOBII_ERROR_NO_ERROR) {
-        printf("%s % \n", tobii_error_message(result), msg);
-        return true;
+        // Enumerate devices to find connected eye trackers, keep the first
+        char url[256] = { 0 };
+        result = tobii_enumerate_local_device_urls(api, url_receiver, url);
+
+        if (assert_tobii_error(result))
+            return -1;
+
+        if (*url == '\0'){
+            std::cerr << "[ERROR] No device found\n";
+            return -1;
+        }
+
+        result = tobii_device_create(api, url, TOBII_FIELD_OF_USE_INTERACTIVE, &device);
+
+        if (assert_tobii_error(result, "device"))
+            return -1;
+
+        // Subscribe to gaze data
+        result = tobii_gaze_point_subscribe(device, gaze_point_callback, 0);
+        result = tobii_gaze_origin_subscribe(device, gaze_origin_callback, 0);
+        result = tobii_eye_position_normalized_subscribe(device, eye_position_callback, 0);
+
+        if (assert_tobii_error(result, "subscription"))
+            return -1;
+
+        if (!updating) {
+            updating = true;
+            update_thread = std::thread(updateRecords);
+        }
+        update_thread.joinable();
+
+        return 1;
     }
-    return false;
-}
 
-int start(int cam_index, char* images_path) {
-    // set the images directory 
-    user_images_path = images_path;
-    if(!cap.open(cam_index)){
-        printf("Error: Camera error \n");
+    int stop() {
+        // Cleanup
+        if (device != NULL) {
+            result = tobii_gaze_point_unsubscribe(device);
+            if (assert_tobii_error(result, "unsubscribed"))
+                return result;
+
+            result = tobii_device_destroy(device);
+            if (assert_tobii_error(result, "dev destroy "))
+                return result;
+        }
+        if (api != NULL) {
+            result = tobii_api_destroy(api);
+            if (assert_tobii_error(result, "api destroy "))
+                return result;
+        }
+        return 0;
+    }
+}tobiiCtrl;
+
+
+void start(const char* path = nullptr, int delay = -1, const char* out_path = nullptr) {
+    cv::VideoCapture cap;
+    std::string win_name = "cam feed";
+    std::string user_images_path;
+
+    if (path != nullptr) {
+        sessionRecord.update(path);
+        cv::namedWindow(win_name);
+        // start recording from the tracker
+        sessionRecord.record_tracker = true;
+        std::cout << "[INFO] tracker device initialised and returns status code : "
+                << tobiiCtrl.start() << std::endl;
+
+        if (delay == -1) {
+            // need to get the video fps
+            cap = cv::VideoCapture(path);
+            double fps = cap.get(cv::CAP_PROP_FPS);
+            delay = (int)(1000 / fps);
+            std::cout << "[INFO] using the fps of " << fps << " delaying for next frame by "
+                      << delay << " milliseconds " << std::endl;
+        }
     }
     else {
-        frame_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
-        frame_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
-        video = cv::VideoWriter(user_images_path + "/avi-video.avi", cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, cv::Size(frame_width, frame_height), true);
-    }
-
-    if (assert_tobii_error(result))
-        return -1;
-
-    // Enumerate devices to find connected eye trackers, keep the first
-    char url[256] = { 0 };
-    result = tobii_enumerate_local_device_urls(api, url_receiver, url);
-
-    if (assert_tobii_error(result))
-          return -1;
-
-    if (*url == '\0'){
-        printf("Error: No device found\n");
-        return -1;
-    }
-
-    result = tobii_device_create(api, url, TOBII_FIELD_OF_USE_INTERACTIVE, &device);
-
-    if (assert_tobii_error(result, "device"))
-          return -1;
-
-    // Subscribe to gaze data
-    result = tobii_gaze_point_subscribe(device, gaze_point_callback, 0);
-    result = tobii_gaze_origin_subscribe(device, gaze_origin_callback, 0);
-    result = tobii_eye_position_normalized_subscribe(device, eye_position_callback, 0);
-
-    if (assert_tobii_error(result, "subscription"))
-          return -1;
-
-    if (!updating) {
-        updating = true;
-        update_thread = std::thread(updateRecords);
-    }
-    update_thread.joinable();
-    return 1;
-}
-
-
-int stop() {
-    std::deque<std::thread> threads;
-    if (updating) {
-        updating = false;
-        update_thread.join();
-        for (int i = 0; i < Frames.size(); i ++) {
-            threads.push_back(std::thread(save_to_file, i));
+        while (!cap.open(0)) {
+            std::cerr << "failed to open cap" << std::endl;
+            return;
         }
-        printf("saving images \n");
+        if (delay == -1) {
+            // user hasn't defined the wait time for the web-cam
+            delay = 1;
+        }
+        // setup video writer
+        if(out_path != nullptr){
+            user_images_path = std::string(out_path);
+            const int frame_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+            const int frame_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+            const cv::VideoWriter video = cv::VideoWriter(user_images_path + "/avi-video.avi",
+                                                          cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10,
+                                                          cv::Size(frame_width, frame_height), true);
+        }
     }
 
-    if (cap.isOpened()) {
-        cap.release();
+    long counter = 0;
+    double st = timeInSeconds();
+    cv::Mat img;
+    while (!sessionRecord.break_out_updates()) {
+        if (path != nullptr) {
+            // video source is prepared file
+            img = sessionRecord.getFrameAt(counter);
+            if (img.empty()) {
+                break;
+            }
+            cv::imshow(win_name, img);
+            sessionRecord.update(counter);
+            if (cv::waitKey(delay) == 27) {
+                break;
+            }
+        }
+        else {
+            // video source is camera
+            cap >> img;
+            sessionRecord.update(Frame(img, counter), true);
+            video.write(img);
+        }
+        counter += 1;
     }
 
-    for (int i = 0; i < threads.size(); ++i) {
-        threads[i].join();
+    double time_diff = timeInSeconds() - st;
+    if (time_diff != 0 && path != nullptr) {
+        sessionRecord.record_tracker = false;
+        sessionRecord.stop_updates = true;
+        cv::destroyWindow(win_name);
+        if (!user_images_path.empty()){
+            sessionRecord.save_images();
+        }
     }
-    printf("saved  %Ii images \n", Frames.size());
-    // Cleanup
-    if (device != NULL) {
-        result = tobii_gaze_point_unsubscribe(device);
-        if (assert_tobii_error(result, "unsubscription"))
-            return result;
-
-        result = tobii_device_destroy(device);
-        if (assert_tobii_error(result, "dev destroy "))
-            return result;
-    }       
-    if (api != NULL) {
-        result = tobii_api_destroy(api);
-        if (assert_tobii_error(result, "api destroy "))
-            return result;
+        std::cout << "[INFO] after " << time_diff << " seconds, factual video fps: "
+                        << (double)counter / (time_diff) << std::endl;
+        std::cout << "[INFO] tracker device stopped and returned code: " << tobiiCtrl.stop() << std::endl;
     }
-    return 0;
+    cap.release();
 }
 
-Record* get_latest(int f_id) {   
-    if (!all_frames.empty()) {
-        Frames.push_back(all_frames.back());
-        video.write(all_frames.back());
-    }    
-    return &tmp_record;
+std::string get_json_records(){
+    return sessionRecord.to_json();
 }
 
-Record* get_records(int frame_id) {
-    return &tmp_record;
+SessionRecord* get_records() {
+    return &sessionRecord;
 }
