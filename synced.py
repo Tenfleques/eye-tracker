@@ -217,7 +217,7 @@ class Synced:
                 os.makedirs(self.img_dir, exist_ok=True)
                 # start the devices
                 self.tobii_lib.start(0, bytes(self.img_dir, encoding='utf-8'))
-                factual_fps = self.frame_capture(self.vid_cap, self.record_processor, lambda: self.stop_feed, replay)
+                factual_fps = self.video_frame_capture(self.vid_cap, self.record_processor, lambda: self.stop_feed)
             else:
                 factual_fps = self.frame_capture(self.vid_cap, self.replay_processor, lambda: self.stop_feed, replay)
 
@@ -390,6 +390,86 @@ class Synced:
             return False
 
         return True
+
+    def video_frame_capture(self, cap, cb, should_stop):
+        """
+        The process for showing frames on the screen during recording
+        :param cap: [CV2::VideoCapture] from which frames are read
+        :param cb: [Function] The callback function to process the captured frame
+        :param should_stop: [Function] the function to signal the process to stop if it is in thread
+        :return:
+        """
+        frame_id = 0
+
+        ready = False
+        # wait for all to be ready for 10 seconds, longer than that give up
+        for i in range(self.poll_wait):
+            print("polling for the devices ... {}".format(i))
+            sys.stdout.flush()
+            if self.all_ready():
+                ready = True
+                break
+            time.sleep(1)
+
+        if not ready:
+            print("[ERROR]got tired of waiting...")
+            sys.stdout.flush()
+            return -1
+
+        frames = deque()
+        print("[INFO] collecting video frames to memory")
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(frame)
+
+        cap.release()
+        print("[INFO] collected {} frames".format(len(frames)))
+
+        waits = 30
+        # in the event that vid_fps is undefined or 0 or None, escape division by zero
+        if self.vid_fps:
+            waits = int(1000.0 / self.vid_fps)
+
+        # set the video to full screen
+        cv2.namedWindow(self.video_name, cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty(self.video_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+        st = time.time()
+        while len(frames):
+
+            if should_stop():
+                break
+            # read the next frame
+            frame = frames.popleft()
+
+            if not frame:
+                break
+
+            # first few frames takes longer,
+            # for a truthful Factual FPS reset time for every frame less than the first stable frame
+            if frame_id < 5:
+                self.render_rect = cv2.getWindowImageRect(self.video_name)
+                st = time.time()
+
+            cb(frame_id, frame)
+
+            key = cv2.waitKey(waits)
+
+            # signal stop if user press Q, or q
+            if key == ord('Q') or key == ord('q'):
+                break
+            # increment the frame index
+            frame_id += 1
+
+        # calculate the Factual Rate used
+        if time.time() - st:
+            factual_rate = frame_id / (time.time() - st)
+            return factual_rate
+
+        return 0
 
     def frame_capture(self, cap, cb, should_stop, replay=False):
         """
