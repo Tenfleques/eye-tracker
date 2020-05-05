@@ -267,6 +267,14 @@ struct SessionRecord {
         cv::Mat img;
         return img;
     }
+    cv::Mat popFrame() {
+        cv::Mat img;
+        if (video_frames.size() > 0) {
+            img = video_frames[0].frame;
+            video_frames.pop_front();
+        }
+        return img;
+    }
     static std::string frames_json(const std::deque<Frame>& f) {
         std::string frames;
         for (const auto& s : f) {
@@ -535,7 +543,7 @@ void start(const char* path = nullptr, int delay = -1, const char* out_path = nu
         else {
             // video source is camera
             cap >> img;
-            //sessionRecord.update(Frame(img, counter), true);
+            sessionRecord.update(Frame(img, counter), true);
             video.write(img);
         }
         counter += 1;

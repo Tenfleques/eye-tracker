@@ -142,3 +142,4 @@ cmake-build-debug
 cmake-build-debug
 *.idea
 .idea
+*opencv_world430d.dll

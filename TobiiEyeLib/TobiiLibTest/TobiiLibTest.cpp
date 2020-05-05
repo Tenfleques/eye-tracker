@@ -267,6 +267,14 @@ struct SessionRecord {
         cv::Mat img;
         return img;
     }
+    cv::Mat popFrame() {
+        cv::Mat img;
+        if (video_frames.size() > 0) {
+            img = video_frames[0].frame;
+            video_frames.pop_front();
+        }        
+        return img;
+    }
     static std::string frames_json(const std::deque<Frame>& f) {
         std::string frames;
         for (const auto& s : f) {
@@ -535,7 +543,7 @@ void start(const char* path = nullptr, int delay = -1, const char* out_path = nu
         else {
             // video source is camera
             cap >> img;
-            //sessionRecord.update(Frame(img, counter), true);
+            sessionRecord.update(Frame(img, counter), true);
             video.write(img);
         }
         counter += 1;
@@ -589,20 +597,25 @@ int run(const char* src_path = nullptr, const char* out_path = nullptr) {
 }
 int main(int argc, char* argv[]){
 
-    const char* def_src = "./data/stimulus_sample.mp4";
-    const char* def_out = "./data";
-    if (argc == 3) {
-        const char* src = argv[1];
-        const char* dst = argv[2];
-        run(src, dst);
-    }
-    else {
-        run(def_src, def_out);
-    }
+    std::string def_src = "./data/stimulus_sample.mp4";
+    std::string def_out = "./data";
     
+    if (argc == 3) {
+        def_src = argv[1];
+        def_out = argv[2];
+       
+    }
+    std::string out_json = def_out;
+    run(def_src.c_str(), def_out.c_str());
+
     std::ofstream f;
-    f.open("./data/results.json");
+    f.open(out_json + "/results.json");
     f << sessionRecord.to_json();
     f.close();   
+
+    std::cout << "INFO saving images" << std::endl;
+    save_images(out_json.c_str());
+    std::cout << "INFO saved images" << std::endl;
+    exit(0);
     return 0;
 }
