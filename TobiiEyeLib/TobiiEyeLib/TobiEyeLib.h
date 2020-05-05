@@ -13,8 +13,10 @@ struct SessionRecord;
 extern "C" TOBIEYELIB_API long save_images(const char* out_path = nullptr);
 
 extern "C" TOBIEYELIB_API int run(const char* src_path = nullptr,
-    const char* out_path = nullptr);
+    const char* out_path = nullptr, int delay = -1);
 
 extern "C" TOBIEYELIB_API const char* get_json();
+
+extern "C" TOBIEYELIB_API void stop();
 
 extern "C" TOBIEYELIB_API SessionRecord* get_session();

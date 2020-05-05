@@ -84,7 +84,7 @@ class Synced:
 
     # fast appends, 0(1) contains session data at the end of recording
     FRAMES = deque()
-
+    render_rect = None
     stop_tobii_thread = None
 
     def __init__(self, video_path, save_dir="sample",
@@ -165,16 +165,12 @@ class Synced:
         chart = get_img_from_fig(fig, 200)
 
         chart = cv2.resize(chart, dsize=(500, 300), interpolation=cv2.INTER_CUBIC)
-        x = self.SCREEN_SIZE[0] - 500
-        y = 50
-
-        self.bg_frame[:, :, :] = 255
-        self.bg_frame[y:y+300, x:x+500, :] = chart
 
         self.metrics = {
             "mean": times.mean(),
             "min": mn,
-            "max": mx
+            "max": mx,
+            "chart": chart
         }
 
     def log_frames(self):
@@ -308,9 +304,15 @@ class Synced:
         font_size = 1.1
 
         x = self.SCREEN_SIZE[0] - 550
-
+        frame = cv2.resize(frame, (self.render_rect[2] - self.render_rect[0], self.render_rect[3] - self.render_rect[1]))
         self.bg_frame[:, :x, :] = self.bg_color
+        self.bg_frame[self.render_rect[1]:self.render_rect[3], self.render_rect[0]:self.render_rect[2], :] = frame
         self.bg_frame[360:, x:, :] = 200
+        y = 50
+
+        self.bg_frame[:, :, :] = 255
+        self.bg_frame[y:y+300, x:x+500, :] = self.metrics["chart"]
+
 
         x += 10
         cv2.putText(self.bg_frame,
@@ -442,6 +444,8 @@ class Synced:
             # first few frames takes longer,
             # for a truthful Factual FPS reset time for every frame less than the first stable frame
             if frame_id < 5:
+                if not replay:
+                    self.render_rect = cv2.getWindowImageRect(self.video_name)
                 st = time.time()
 
             cb(frame_id, frame)
@@ -467,7 +471,7 @@ class Synced:
 
 if __name__ == "__main__":
     synced = Synced("./data/stimulus_sample.mp4",
-                    dll_path="TobiiEyeLib/x64/Release/TobiiEyeLib.dll",)
+                    dll_path="./sync_dlls/TobiiEyeLib.dll",)
     synced.start(video_fps=1000)
     # print("start replay")
     synced.replay(video_fps=30)

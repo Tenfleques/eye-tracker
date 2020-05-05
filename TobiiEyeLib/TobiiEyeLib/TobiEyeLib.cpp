@@ -108,6 +108,7 @@ struct Point3D : Point2D {
     }
     float z;
 };
+
 struct Eyes {
     Eyes(Point3D l, Point3D r) : left(std::move(l)), right(std::move(r)) {};
     Eyes(const float l[3], const float r[3]) : left(Point3D(l)), right(Point3D(r)) {};
@@ -124,6 +125,7 @@ struct Eyes {
     Point3D left, right;
     bool v_l = false, v_r = false;
 };
+
 struct Pos3D : Eyes {
     double timestamp;
     int64_t timestamp_us = 0;
@@ -139,9 +141,9 @@ struct Pos3D : Eyes {
         std::stringstream ss;
         std::stringstream sv_l;
         std::stringstream sv_r;
-        sv_l << "\"valid\": " << v_l;
+        sv_l << ",\"valid\": " << v_l;
 
-        sv_r << "\"valid\": " << v_r;
+        sv_r << ",\"valid\": " << v_r;
 
         ss << "{\"timestamp\": " << std::fixed << timestamp
             << ",\"timestamp_us\": " << timestamp_us
@@ -449,6 +451,14 @@ struct tobiiCtrl {
 void tobii_thread() {
     tobiiCtrl.updateRecords();
 }
+
+void stop() {
+    sessionRecord.record_tracker = false;
+    sessionRecord.stop_updates = true;
+
+    std::cout << "[INFO] stopping..." << std::endl;
+}
+
 void start(const char* path = nullptr, int delay = -1, const char* out_path = nullptr) {
     cv::VideoCapture cap;
     std::string win_name = "cam feed";
@@ -458,11 +468,14 @@ void start(const char* path = nullptr, int delay = -1, const char* out_path = nu
     int tobii_started = -1;
 
     if (path != nullptr) {
+        // video source is file
         int video_ready = sessionRecord.update(path);
         win_name = path;
         // start recording from the tracker
         if (video_ready == 0) {
             cv::namedWindow(win_name);
+            cv::namedWindow(win_name, cv::WND_PROP_FULLSCREEN);
+            cv::setWindowProperty(win_name, cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
             sessionRecord.record_tracker = true;
             tobii_started = tobiiCtrl.start();
             if (tobii_started == 0) {
@@ -471,7 +484,7 @@ void start(const char* path = nullptr, int delay = -1, const char* out_path = nu
                     << tobii_started << std::endl;
             }
             else {
-                std::cout << "[ERROR] tracker device failed to initialise and returns status code : "
+                std::cerr << "[ERROR] tracker device failed to initialise and returns status code : "
                     << tobii_started << std::endl;
                 sessionRecord.record_tracker = false;
                 sessionRecord.stop_updates = true;
@@ -510,8 +523,8 @@ void start(const char* path = nullptr, int delay = -1, const char* out_path = nu
         // setup video writer
         if (out_path != nullptr) {
             user_images_path = std::string(out_path);
-            const int frame_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
-            const int frame_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+            int frame_width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+            int frame_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
             video = cv::VideoWriter(user_images_path + "/avi-video.avi",
                 cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10,
                 cv::Size(frame_width, frame_height), true);
@@ -590,9 +603,9 @@ long save_images(const char* out_path = nullptr) {
     return -1;
 }
 
-int run(const char* src_path = nullptr, const char* out_path = nullptr) {
+int run(const char* src_path = nullptr, const char* out_path = nullptr, int delay = -1) {
     std::thread cam_thread(start, nullptr, 1, nullptr);
-    start(src_path, -1, out_path);
+    start(src_path, delay, out_path);
     cam_thread.join();
     return 0;
 }
