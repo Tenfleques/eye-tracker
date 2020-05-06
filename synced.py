@@ -84,8 +84,9 @@ class Synced:
 
     # fast appends, 0(1) contains session data at the end of recording
     FRAMES = deque()
-
+    render_rect = None
     stop_tobii_thread = None
+    real_time_gaze = False
 
     def __init__(self, video_path, save_dir="sample",
                  dll_path="TobiiEyeLib/x64/Debug/TobiiEyeLib.dll",
@@ -165,16 +166,12 @@ class Synced:
         chart = get_img_from_fig(fig, 200)
 
         chart = cv2.resize(chart, dsize=(500, 300), interpolation=cv2.INTER_CUBIC)
-        x = self.SCREEN_SIZE[0] - 500
-        y = 50
-
-        self.bg_frame[:, :, :] = 255
-        self.bg_frame[y:y+300, x:x+500, :] = chart
 
         self.metrics = {
             "mean": times.mean(),
             "min": mn,
-            "max": mx
+            "max": mx,
+            "chart": chart
         }
 
     def log_frames(self):
@@ -192,7 +189,7 @@ class Synced:
             print("gaze_time: {}, time: {}, acc: {} \n gaze: {}\n\n".format(gaze_time,
                                                                             tm, abs(gaze_time - tm), tracker["gaze"]))
 
-    def start(self, video_fps=None, replay=False):
+    def start(self, video_fps=None, replay=False, real_time_gaze = False):
         """
 
         :param video_fps:
@@ -205,6 +202,7 @@ class Synced:
         self.vid_cap = None
         self.vid_cap = cv2.VideoCapture(self.video_path)
         self.video_name = "replay: {}".format(self.video_path.split(os.sep)[-1])
+        self.real_time_gaze = real_time_gaze
 
         if video_fps:
             self.vid_fps = video_fps
@@ -283,6 +281,10 @@ class Synced:
         # print("latency {}".format(latency))
         # sys.stdout.flush()
 
+
+        self.bg_frame[:, :, :] = self.bg_color
+        # self.bg_frame[self.render_rect[1]:self.render_rect[3], self.render_rect[0]:self.render_rect[2], :] = frame
+        self.bg_frame[0:frame.shape[0], 0:frame.shape[1], :] = frame
         if tracker.sys_clock:
             self.FRAMES.append({
                 "frame": frame_id,
@@ -293,8 +295,29 @@ class Synced:
                 },
                 "tracker": tracker.to_dict()
             })
-
-        cv2.imshow(self.video_name, frame)
+            if self.real_time_gaze:
+                color = [(100, 20, 20), (20, 100, 20), (20, 20, 100)]
+                xyv = tracker.gaze
+                x1 = int(xyv.x * self.SCREEN_SIZE[0])
+                y1 = int(xyv.y * self.SCREEN_SIZE[1])
+                # box_w = 20
+                # box_h = 20
+                # create target circle
+                # radius = min(10, self.SCREEN_SIZE[0] - x1, self.SCREEN_SIZE[1] - y1)
+                radius = 10
+                cv2.circle(self.bg_frame, (x1, y1), radius,
+                           color[2], thickness=2, lineType=8, shift=0)
+                # # cv2.rectangle(self.bg_frame, (x1, y1), (x1 + box_w, y1 + box_h), color[2], -1)
+                radius = max(min(radius - 5, radius - 10),  0)
+                # horizontal line
+                a, b = (x1 - radius, y1), (x1 + radius, y1)
+                cv2.line(self.bg_frame, a, b,
+                         color[1], thickness=1, lineType=8, shift=0)
+                # vertical line
+                a, b = (x1, y1 - radius), (x1, y1 + radius)
+                cv2.line(self.bg_frame, a, b,
+                         color[1], thickness=1, lineType=8, shift=0)
+            cv2.imshow(self.video_name, self.bg_frame)
         return
 
     def replay_processor(self, frame_id, frame):
@@ -307,10 +330,20 @@ class Synced:
         color = [(100, 20, 20), (20, 100, 20), (20, 20, 100)]
         font_size = 1.1
 
-        x = self.SCREEN_SIZE[0] - 550
+        frame_id
 
+        x = self.SCREEN_SIZE[0] - 550
+        self.bg_frame[:, :, :] = 255
+        ww = self.render_rect[2] - self.render_rect[0]
+        hh = self.render_rect[3] - self.render_rect[1]
+        # frame = cv2.resize(frame, (ww, hh))
         self.bg_frame[:, :x, :] = self.bg_color
+        # self.bg_frame[self.render_rect[1]:self.render_rect[3], self.render_rect[0]:self.render_rect[2], :] = frame
+        self.bg_frame[0:frame.shape[0], 0:frame.shape[1], :] = frame
         self.bg_frame[360:, x:, :] = 200
+        y = 50
+        self.bg_frame[y:y+300, x:x+500, :] = self.metrics["chart"]
+
 
         x += 10
         cv2.putText(self.bg_frame,
@@ -338,16 +371,17 @@ class Synced:
 
             if xyv["valid"]:
                 if True:  # 0.0 < xyv["x"] < 1.0 and 0.0 < xyv["y"] < 1.0:
-                    x1 = int(self.SCREEN_SIZE[0] * xyv["x"])
-                    y1 = int(self.SCREEN_SIZE[1] * xyv["y"])
+                    x1 = int(xyv["x"] * self.SCREEN_SIZE[0])
+                    y1 = int(xyv["y"] * self.SCREEN_SIZE[1])
                     # box_w = 20
                     # box_h = 20
                     # create target circle
-                    radius = min(20, self.SCREEN_SIZE[0] - x1, self.SCREEN_SIZE[1] - y1)
+                    # radius = min(10, self.SCREEN_SIZE[0] - x1, self.SCREEN_SIZE[1] - y1)
+                    radius = 10
                     cv2.circle(self.bg_frame, (x1, y1), radius,
                                color[2], thickness=2, lineType=8, shift=0)
                     # # cv2.rectangle(self.bg_frame, (x1, y1), (x1 + box_w, y1 + box_h), color[2], -1)
-                    radius = max(min(radius - 5, radius - 10, radius - 15),  0)
+                    radius = max(min(radius - 5, radius - 10),  0)
                     # horizontal line
                     a, b = (x1 - radius, y1), (x1 + radius, y1)
                     cv2.line(self.bg_frame, a, b,
@@ -425,8 +459,8 @@ class Synced:
             waits = int(1000.0 / self.vid_fps)
 
         # set the video to full screen
-        cv2.namedWindow(self.video_name, cv2.WND_PROP_FULLSCREEN)
-        cv2.setWindowProperty(self.video_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        # cv2.namedWindow(self.video_name, cv2.WND_PROP_FULLSCREEN)
+        # cv2.setWindowProperty(self.video_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
         st = time.time()
         while cap.isOpened():
@@ -442,6 +476,8 @@ class Synced:
             # first few frames takes longer,
             # for a truthful Factual FPS reset time for every frame less than the first stable frame
             if frame_id < 5:
+                if not replay:
+                    self.render_rect = cv2.getWindowImageRect(self.video_name)
                 st = time.time()
 
             cb(frame_id, frame)
